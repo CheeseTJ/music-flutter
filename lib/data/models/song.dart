@@ -6,7 +6,6 @@ class Song {
   final String format;
   final int duration;
   final int size;
-  final String? coverPath;
   final String? lyricPath;
   final int createdAt;
 
@@ -18,7 +17,6 @@ class Song {
     required this.format,
     required this.duration,
     required this.size,
-    this.coverPath,
     this.lyricPath,
     required this.createdAt,
   });
@@ -32,7 +30,6 @@ class Song {
       format: json['format'] as String,
       duration: json['duration'] as int,
       size: json['size'] as int,
-      coverPath: json['cover_path'] as String?,
       lyricPath: json['lyric_path'] as String?,
       createdAt: json['created_at'] as int,
     );
@@ -47,7 +44,6 @@ class Song {
       'format': format,
       'duration': duration,
       'size': size,
-      'cover_path': coverPath,
       'lyric_path': lyricPath,
       'created_at': createdAt,
     };
@@ -60,6 +56,8 @@ class Song {
   }
 
   String get formatLabel => format.toUpperCase();
+
+  bool get hasLyric => lyricPath != null && lyricPath!.isNotEmpty; // lyric_path is set to 'db' when lyric text stored in DB
 
   String get sizeFormatted {
     if (size < 1024 * 1024) {

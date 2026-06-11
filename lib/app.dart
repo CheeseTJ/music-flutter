@@ -9,7 +9,7 @@ class MusicApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Music',
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.dark,
       routerConfig: appRouter,
       debugShowCheckedModeBanner: false,
     );

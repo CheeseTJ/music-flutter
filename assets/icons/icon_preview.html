@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music App Icon Preview</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 48px;
+    background: #0A0C10;
+    font-family: system-ui, -apple-system, sans-serif;
+    padding: 40px 20px;
+  }
+
+  .sizes {
+    display: flex;
+    align-items: flex-end;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .size-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .size-label {
+    color: #8B8578;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .icon-wrapper {
+    position: relative;
+    border-radius: 22.2%;
+    overflow: hidden;
+    background: #0A0C10;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 4px 24px rgba(0,0,0,0.5);
+  }
+
+  .icon-wrapper.lg  { width: 240px; height: 240px; border-radius: 22.2%; }
+  .icon-wrapper.md  { width: 120px; height: 120px; border-radius: 22.2%; }
+  .icon-wrapper.sm  { width: 72px;  height: 72px;  border-radius: 22.2%; }
+  .icon-wrapper.xs  { width: 48px;  height: 48px;  border-radius: 22.2%; }
+
+  .icon-surface {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0A0C10;
+  }
+
+  .icon-surface svg {
+    width: 48%;
+    height: auto;
+  }
+
+  .info {
+    color: #8B8578;
+    font-size: 14px;
+    text-align: center;
+    max-width: 480px;
+    line-height: 1.7;
+  }
+
+  .info strong { color: #D4A853; font-weight: 600; }
+  .info em   { color: #E8E0D5; font-style: normal; }
+</style>
+</head>
+<body>
+
+<div class="sizes">
+  <div class="size-group">
+    <div class="icon-wrapper lg">
+      <div class="icon-surface">
+        <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="glow-lg" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#E8C97A" stop-opacity="0.18"/>
+              <stop offset="60%" stop-color="#E8C97A" stop-opacity="0.04"/>
+              <stop offset="100%" stop-color="#E8C97A" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="85" fill="url(#glow-lg)"/>
+          <ellipse cx="124" cy="130" rx="24" ry="18" fill="#D4A853"/>
+          <rect x="144.5" y="40" width="5" height="90" rx="2.5" fill="#D4A853"/>
+          <path d="M149.5 40 C 165 50, 165 68, 124 80" stroke="#D4A853" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M149.5 40 C 162 46, 162 58, 130 68" stroke="#D4A853" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+    <span class="size-label">192dp · xxxhdpi</span>
+  </div>
+
+  <div class="size-group">
+    <div class="icon-wrapper md">
+      <div class="icon-surface">
+        <svg viewBox="0 0 200 200" fill="none">
+          <defs>
+            <radialGradient id="glow-md" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#E8C97A" stop-opacity="0.18"/>
+              <stop offset="60%" stop-color="#E8C97A" stop-opacity="0.04"/>
+              <stop offset="100%" stop-color="#E8C97A" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="85" fill="url(#glow-md)"/>
+          <ellipse cx="124" cy="130" rx="24" ry="18" fill="#D4A853"/>
+          <rect x="144.5" y="40" width="5" height="90" rx="2.5" fill="#D4A853"/>
+          <path d="M149.5 40 C 165 50, 165 68, 124 80" stroke="#D4A853" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <path d="M149.5 40 C 162 46, 162 58, 130 68" stroke="#D4A853" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+    <span class="size-label">96dp · xhdpi</span>
+  </div>
+
+  <div class="size-group">
+    <div class="icon-wrapper sm">
+      <div class="icon-surface">
+        <svg viewBox="0 0 200 200" fill="none">
+          <defs>
+            <radialGradient id="glow-sm" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#E8C97A" stop-opacity="0.20"/>
+              <stop offset="60%" stop-color="#E8C97A" stop-opacity="0.05"/>
+              <stop offset="100%" stop-color="#E8C97A" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="100" cy="100" r="90" fill="url(#glow-sm)"/>
+          <ellipse cx="124" cy="130" rx="26" ry="19" fill="#D4A853"/>
+          <rect x="146" y="38" width="5.5" height="92" rx="2.75" fill="#D4A853"/>
+          <path d="M151 40 C 170 52, 168 70, 122 82" stroke="#D4A853" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <path d="M151 40 C 165 47, 164 59, 126 70" stroke="#D4A853" stroke-width="5" stroke-linecap="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+    <span class="size-label">48dp · mdpi</span>
+  </div>
+</div>
+
+<div class="info">
+  <strong>Music App</strong> &mdash;
+  <em>#0A0C10</em> deep charcoal &middot;
+  <em>#D4A853</em> warm gold note &middot;
+  <em>#E8C97A</em> soft ambient glow
+</div>
+
+</body>
+</html>
