@@ -12,6 +12,7 @@ dependencies:
   flutter_riverpod: ^2.5.0
   go_router: ^14.0.0
   just_audio: ^0.9.38
+  audio_service: ^0.18.15
   dio: ^5.4.0
   crypto: ^3.0.3
   file_picker: ^8.0.0

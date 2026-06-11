@@ -4,8 +4,23 @@ import 'dart:typed_data';
 
 class ITunesCoverService {
   static final Map<int, Uint8List> _memory = {};
+  static final Map<int, String> _urlCache = {};
 
   const ITunesCoverService();
+
+  Future<String?> fetchUrl(String title, String artist) async {
+    final key = '${title}_$artist'.hashCode;
+    final cached = _urlCache[key];
+    if (cached != null) return cached;
+
+    try {
+      final artworkUrl = await _searchArtwork(title, artist);
+      if (artworkUrl != null) _urlCache[key] = artworkUrl;
+      return artworkUrl;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<Uint8List?> fetch(String title, String artist) async {
     final key = '${title}_$artist'.hashCode;

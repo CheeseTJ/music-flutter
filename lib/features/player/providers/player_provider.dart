@@ -6,6 +6,8 @@ import 'package:just_audio/just_audio.dart';
 import '../../../data/models/song.dart';
 import '../../../data/models/lrc_parser.dart';
 import '../../../data/datasources/remote/api_client.dart';
+import '../../../core/network/itunes_cover_service.dart';
+import '../../../core/audio/audio_player_handler.dart';
 
 enum PlayerPhase { idle, loading, playing, paused, error }
 
@@ -30,7 +32,7 @@ class PlayerState {
 }
 
 class PlayerController extends StateNotifier<PlayerState> {
-  final AudioPlayer _player = AudioPlayer();
+  MusicAudioHandler _handler;
   final ApiClient _apiClient;
   Song? _currentSong;
   List<Song> _playlist = [];
@@ -44,17 +46,34 @@ class PlayerController extends StateNotifier<PlayerState> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<dynamic>? _completeSub;
+  StreamSubscription<bool>? _playingSub;
 
   static String get _lyricCacheDir => '${Directory.systemTemp.path}/lyric_cache';
 
-  PlayerController(this._apiClient) : super(PlayerState.idle()) {
+  PlayerController(this._apiClient, this._handler) : super(PlayerState.idle()) {
     Directory(_lyricCacheDir).createSync(recursive: true);
+    _wireHandlerCallbacks();
   }
 
-  AudioPlayer get player => _player;
+  void setHandler(MusicAudioHandler handler) {
+    _handler = handler;
+    _wireHandlerCallbacks();
+  }
+
+  void _wireHandlerCallbacks() {
+    _handler.onSkipToNext = () {
+      if (_playlist.isNotEmpty) next();
+    };
+    _handler.onSkipToPrevious = () {
+      if (_playlist.isNotEmpty) previous();
+    };
+  }
+
+  MusicAudioHandler get handler => _handler;
+  AudioPlayer get player => _handler.player;
   Song? get currentSong => _currentSong;
-  Duration get position => _player.position;
-  Duration? get duration => _player.duration;
+  Duration get position => _handler.position;
+  Duration? get duration => _handler.duration;
   bool get hasNext => _currentIndex < _playlist.length - 1;
   bool get hasPrevious => _currentIndex > 0;
   int get playMode => _playMode;
@@ -80,16 +99,32 @@ class PlayerController extends StateNotifier<PlayerState> {
       final data = await _apiClient.getPlayUrl(song.id);
       final url = data['url'] as String;
 
-      await _player.setUrl(url);
-      _player.play();
+      final coverService = ITunesCoverService();
+      final coverUrl = await coverService.fetchUrl(song.title, song.artist);
+
+      await _handler.loadSong(
+        url: url,
+        id: song.id.toString(),
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        artUri: coverUrl != null ? Uri.parse(coverUrl) : null,
+      );
+      await _handler.play();
       state = PlayerState.playing();
 
       _positionSub?.cancel();
       _durationSub?.cancel();
       _completeSub?.cancel();
-      _positionSub = _player.positionStream.listen(_onPositionChanged);
-      _durationSub = _player.durationStream.listen((_) {});
-      _completeSub = _player.playerStateStream.listen((ps) {
+      _playingSub?.cancel();
+      _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
+      _durationSub = _handler.player.durationStream.listen((_) {});
+      _playingSub = _handler.player.playingStream.listen((playing) {
+        if (!playing && state.isPlaying) {
+          state = PlayerState.paused();
+        }
+      });
+      _completeSub = _handler.player.playerStateStream.listen((ps) {
         if (ps.processingState == ProcessingState.completed) {
           onSongEnd();
         }
@@ -153,8 +188,8 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   void onSongEnd() {
     if (_playMode == 1) {
-      _player.seek(Duration.zero);
-      _player.play();
+      _handler.seek(Duration.zero);
+      _handler.play();
       state = PlayerState.playing();
     } else {
       next();
@@ -208,17 +243,17 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   void togglePlayPause() {
-    if (_player.playing) {
-      _player.pause();
+    if (_handler.playing) {
+      _handler.pause();
       state = PlayerState.paused();
     } else {
-      _player.play();
+      _handler.play();
       state = PlayerState.playing();
     }
   }
 
   void seekTo(Duration position) {
-    _player.seek(position);
+    _handler.seek(position);
   }
 
   void togglePlayMode() {
@@ -231,13 +266,19 @@ class PlayerController extends StateNotifier<PlayerState> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _completeSub?.cancel();
-    _player.dispose();
+    _playingSub?.cancel();
     super.dispose();
   }
 }
 
-final playerProvider =
-    StateNotifierProvider<PlayerController, PlayerState>((ref) {
+final playerProvider = StateNotifierProvider<PlayerController, PlayerState>((ref) {
   final api = ref.read(apiClientProvider);
-  return PlayerController(api);
+  final handler = ref.watch(audioHandlerProvider);
+  final controller = PlayerController(api, handler);
+
+  ref.listen(audioHandlerProvider, (_, next) {
+    controller.setHandler(next);
+  });
+
+  return controller;
 });
