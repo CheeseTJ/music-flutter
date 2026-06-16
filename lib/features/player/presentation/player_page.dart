@@ -1,13 +1,14 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart' hide PlayerState;
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../data/models/song.dart';
 import '../../../data/models/lrc_parser.dart';
-import '../../player/providers/player_provider.dart';
-import '../../player/widgets/player_controls.dart';
 import '../../../core/network/itunes_cover_service.dart';
+import '../../player/providers/player_provider.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   final Song song;
@@ -19,19 +20,18 @@ class PlayerPage extends ConsumerStatefulWidget {
 
 class _PlayerPageState extends ConsumerState<PlayerPage>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _rotateCtrl;
+  Uint8List? _cover;
+  late final AnimationController _fadeCtrl;
 
   @override
   void initState() {
     super.initState();
-    _rotateCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    );
+    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
+    _fadeCtrl.forward();
+    _fetchCover();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final notifier = ref.read(playerProvider.notifier);
-      if (notifier.currentSong?.id != widget.song.id ||
-          notifier.player.processingState != ProcessingState.ready) {
+      if (notifier.currentSong?.id != widget.song.id) {
         notifier.play(widget.song);
       }
     });
@@ -39,89 +39,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   @override
   void dispose() {
-    _rotateCtrl.dispose();
+    _fadeCtrl.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(playerProvider);
-    final notifier = ref.watch(playerProvider.notifier);
-    final song = notifier.currentSong ?? widget.song;
-    final isPlaying = state.isPlaying;
-
-    if (isPlaying && !_rotateCtrl.isAnimating) {
-      _rotateCtrl.repeat();
-    } else if (!isPlaying && _rotateCtrl.isAnimating) {
-      _rotateCtrl.stop();
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.deep,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Column(
-          children: [
-            Text(song.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.text)),
-            Text('${song.artist} · ${song.album}', style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-          ],
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            _Artwork(isPlaying: isPlaying, controller: _rotateCtrl, song: song),
-            const SizedBox(height: 32),
-            _LyricView(),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
-              child: _CompactProgressBar(),
-            ),
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: PlayerControls(),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Artwork extends ConsumerStatefulWidget {
-  final bool isPlaying;
-  final AnimationController controller;
-  final Song song;
-  const _Artwork({required this.isPlaying, required this.controller, required this.song});
-
-  @override
-  ConsumerState<_Artwork> createState() => _ArtworkState();
-}
-
-class _ArtworkState extends ConsumerState<_Artwork> {
-  Uint8List? _cover;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchCover();
-  }
-
-  @override
-  void didUpdateWidget(covariant _Artwork oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.song.id != widget.song.id) {
-      _cover = null;
-      _fetchCover();
-    }
   }
 
   Future<void> _fetchCover() async {
@@ -131,52 +50,219 @@ class _ArtworkState extends ConsumerState<_Artwork> {
 
   @override
   Widget build(BuildContext context) {
-    return RotationTransition(
-      turns: widget.controller,
-      child: Container(
-        width: 260,
-        height: 260,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(180),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2A2015), Color(0xFF141720), Color(0xFF1A1520)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accent.withOpacity(widget.isPlaying ? 0.2 : 0),
-              blurRadius: 40,
-              spreadRadius: 4,
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: _cover != null
-              ? Image.memory(_cover!, fit: BoxFit.cover, width: 260, height: 260)
-              : Center(
-                  child: Container(
-                    width: 80, height: 80,
+    final state = ref.watch(playerProvider);
+    final notifier = ref.watch(playerProvider.notifier);
+    final song = notifier.currentSong ?? widget.song;
+    final isPlaying = state.isPlaying;
+    final isDark = ref.watch(themeProvider).isDark;
+
+    final bg = isDark ? AuroraColors.bgPrimary : HarmoniqColors.bg;
+    final textP = isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary;
+    final textS = isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary;
+
+    return FadeTransition(
+      opacity: _fadeCtrl,
+      child: Scaffold(
+        backgroundColor: bg,
+        body: GestureDetector(
+          onVerticalDragEnd: (details) {
+            if (details.primaryVelocity != null && details.primaryVelocity! > 500) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  // Drag indicator
+                  Container(
+                    width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.deep,
-                      borderRadius: BorderRadius.circular(40),
+                      color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Icon(Icons.music_note_rounded, size: 36, color: AppColors.accent.withOpacity(0.7)),
                   ),
-                ),
+                  const SizedBox(height: 24),
+
+                  // Album Art (320x320)
+                  ScaleTransition(
+                    scale: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(32),
+                      child: Container(
+                        width: 320,
+                        height: 320,
+                        decoration: BoxDecoration(
+                          gradient: isDark
+                              ? const LinearGradient(colors: AuroraColors.gradient)
+                              : LinearGradient(
+                                  colors: [HarmoniqColors.blue.withOpacity(0.3), HarmoniqColors.emphasize.withOpacity(0.3)],
+                                ),
+                          borderRadius: BorderRadius.circular(32),
+                          boxShadow: isDark
+                              ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 40, offset: const Offset(0, 10))]
+                              : [
+                                  BoxShadow(color: const Color(0x14283246), blurRadius: 30, offset: const Offset(0, 10)),
+                                ],
+                        ),
+                        child: _cover != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(32),
+                                child: Image.memory(_cover!, fit: BoxFit.cover, width: 320, height: 320),
+                              )
+                            : Center(
+                                child: Icon(Icons.music_note_rounded, size: 80,
+                                    color: isDark ? Colors.white.withOpacity(0.3) : Colors.white),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Song info
+                  ScaleTransition(
+                    scale: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
+                    child: Column(
+                      children: [
+                        Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: textP, letterSpacing: -0.3)),
+                        const SizedBox(height: 8),
+                        Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 15, color: textS)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Spectrum animation
+                  _SpectrumAnimator(isPlaying: isPlaying, isDark: isDark),
+                  const SizedBox(height: 20),
+
+                  // Progress Bar
+                  _ProgressBar(isDark: isDark),
+                  const SizedBox(height: 24),
+
+                  // Controls
+                  _PlayerControlsBar(isDark: isDark),
+
+                  const SizedBox(height: 16),
+
+                  // Lyrics entry
+                  GestureDetector(
+                    onTap: () => context.push('/lyrics', extra: song),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lyrics_outlined, size: 18,
+                            color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary),
+                        const SizedBox(width: 6),
+                        Text('Lyrics',
+                            style: TextStyle(fontSize: 14,
+                                color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _CompactProgressBar extends ConsumerWidget {
-  const _CompactProgressBar();
+class _SpectrumAnimator extends StatefulWidget {
+  final bool isPlaying;
+  final bool isDark;
+  const _SpectrumAnimator({required this.isPlaying, required this.isDark});
+
+  @override
+  State<_SpectrumAnimator> createState() => _SpectrumAnimatorState();
+}
+
+class _SpectrumAnimatorState extends State<_SpectrumAnimator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  final _rand = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    if (widget.isPlaying) _ctrl.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SpectrumAnimator old) {
+    super.didUpdateWidget(old);
+    if (widget.isPlaying && !_ctrl.isAnimating) {
+      _ctrl.repeat();
+    } else if (!widget.isPlaying && _ctrl.isAnimating) {
+      _ctrl.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const barCount = 24;
+    final color = widget.isDark ? AuroraColors.gradientStart : HarmoniqColors.blue;
+
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        return SizedBox(
+          height: 40,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(barCount, (i) {
+              final heightFactor = widget.isPlaying
+                  ? (0.3 + 0.7 * (0.5 + 0.5 * sin(_ctrl.value * 2 * pi + i * 0.8)))
+                  : 0.2;
+              final barHeight = (4 + 28 * heightFactor).clamp(4.0, 32.0);
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Container(
+                  width: 3,
+                  height: barHeight,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: widget.isDark
+                          ? [AuroraColors.gradientStart, AuroraColors.gradientEnd]
+                          : [HarmoniqColors.blue.withOpacity(0.6), HarmoniqColors.emphasize],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProgressBar extends ConsumerWidget {
+  final bool isDark;
+  const _ProgressBar({required this.isDark});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.watch(playerProvider.notifier);
-    final theme = Theme.of(context);
+    final activeColor = isDark ? AuroraColors.gradientStart : HarmoniqColors.blue;
+    final inactiveColor = isDark ? AuroraColors.surface : HarmoniqColors.aux;
 
     return StreamBuilder<Duration>(
       stream: notifier.player.positionStream,
@@ -187,14 +273,19 @@ class _CompactProgressBar extends ConsumerWidget {
           builder: (context, durSnap) {
             final duration = durSnap.data ?? Duration.zero;
             final max = duration.inMilliseconds.toDouble();
-            final value = (position.inMilliseconds.toDouble()).clamp(0.0, max > 0 ? max : 1) as double;
+            final value = (position.inMilliseconds.toDouble()).clamp(0.0, max > 0 ? max : 1).toDouble();
 
             return Column(
               children: [
                 SliderTheme(
-                  data: theme.sliderTheme.copyWith(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: activeColor,
+                    inactiveTrackColor: inactiveColor,
+                    thumbColor: activeColor,
+                    overlayColor: activeColor.withOpacity(0.12),
                     trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
                   ),
                   child: Slider(
                     value: value,
@@ -202,13 +293,19 @@ class _CompactProgressBar extends ConsumerWidget {
                     onChanged: (v) => notifier.seekTo(Duration(milliseconds: v.toInt())),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_fmt(position), style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                    Text(_fmt(duration), style: const TextStyle(fontSize: 12, color: AppColors.muted)),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_fmt(position),
+                          style: TextStyle(fontSize: 12,
+                              color: isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary)),
+                      Text(_fmt(duration),
+                          style: TextStyle(fontSize: 12,
+                              color: isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary)),
+                    ],
+                  ),
                 ),
               ],
             );
@@ -220,200 +317,91 @@ class _CompactProgressBar extends ConsumerWidget {
 
   String _fmt(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    return '${d.inMinutes}:$m';
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 }
 
-class _LyricView extends ConsumerStatefulWidget {
-  const _LyricView();
+class _PlayerControlsBar extends ConsumerWidget {
+  final bool isDark;
+  const _PlayerControlsBar({required this.isDark});
 
   @override
-  ConsumerState<_LyricView> createState() => _LyricViewState();
-}
-
-class _LyricViewState extends ConsumerState<_LyricView> {
-  final ScrollController _scrollCtrl = ScrollController();
-  int _lastIdx = -1;
-
-  @override
-  void dispose() {
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  static const double _kItemHeight = 54;
-
-  void _scrollTo(int idx) {
-    if (!_scrollCtrl.hasClients || idx < 0) return;
-    final vp = _scrollCtrl.position.viewportDimension;
-    final target = (idx * _kItemHeight) - vp / 2 + _kItemHeight / 2;
-    final clamped = target.clamp(0.0, _scrollCtrl.position.maxScrollExtent);
-    _scrollCtrl.animateTo(clamped,
-        duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.watch(playerProvider.notifier);
     final state = ref.watch(playerProvider);
-    final lyric = notifier.lyric;
+    final isPlaying = state.isPlaying;
 
-    if (state.lyricLoading) {
-      return _SkeletonView();
-    }
-
-    if (state.lyricFailed) {
-      return const Expanded(
-        child: Center(
-          child: Text('暂无歌词', style: TextStyle(color: AppColors.subtle, fontSize: 14)),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        // Shuffle
+        _SmallBtn(icon: Icons.shuffle_rounded, selected: notifier.playMode == 2, isDark: isDark,
+            onTap: () => notifier.togglePlayMode()),
+        // Previous
+        IconButton(
+          icon: Icon(Icons.skip_previous_rounded, size: 32,
+              color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary),
+          onPressed: () => notifier.previous(),
         ),
-      );
-    }
-
-    if (lyric == null || lyric.lines.isEmpty) {
-      return _SkeletonView();
-    }
-
-    return _LyricList(
-      scrollCtrl: _scrollCtrl,
-      itemHeight: _kItemHeight,
-      lyric: lyric,
-      lastIdx: _lastIdx,
-      onIdxChanged: (idx) {
-        _lastIdx = idx;
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(idx));
-      },
-      notifier: notifier,
-    );
-  }
-}
-
-class _SkeletonView extends StatefulWidget {
-  @override
-  State<_SkeletonView> createState() => _SkeletonViewState();
-}
-
-class _SkeletonViewState extends State<_SkeletonView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (context, _) {
-          final alpha = (0.12 + 0.10 * (1 + _ctrl.value)).clamp(0.08, 0.28);
-          final color = AppColors.accent.withOpacity(alpha);
-
-          return ListView.builder(
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: 12, bottom: 12),
-            itemCount: 6,
-            prototypeItem: const SizedBox(height: 54),
-            itemBuilder: (context, i) {
-              final w = 170.0 + (i % 2 == 0 ? 50 : -30).toDouble();
-              return SizedBox(
-                height: 54,
-                child: Center(
-                  child: Container(
-                    width: w,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _LyricList extends StatelessWidget {
-  final ScrollController scrollCtrl;
-  final double itemHeight;
-  final LrcParser lyric;
-  final int lastIdx;
-  final ValueChanged<int> onIdxChanged;
-  final PlayerController notifier;
-
-  const _LyricList({
-    required this.scrollCtrl,
-    required this.itemHeight,
-    required this.lyric,
-    required this.lastIdx,
-    required this.onIdxChanged,
-    required this.notifier,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final lines = lyric.lines;
-    return Expanded(
-      child: StreamBuilder<Duration>(
-        stream: notifier.player.positionStream,
-        builder: (context, snapshot) {
-          final idx = lyric.findIndex(snapshot.data ?? Duration.zero);
-
-          if (idx != lastIdx && idx >= 0) {
-            onIdxChanged(idx);
-          }
-
-          return ListView.builder(
-            controller: scrollCtrl,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            itemCount: lines.length,
-            prototypeItem: SizedBox(
-              height: itemHeight,
-              child: const Center(
-                child: Text('测', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-              ),
+        // Play/Pause (72px)
+        GestureDetector(
+          onTap: () => notifier.togglePlayPause(),
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              gradient: isDark
+                  ? const LinearGradient(colors: [AuroraColors.gradientStart, AuroraColors.gradientEnd])
+                  : const LinearGradient(colors: [HarmoniqColors.blue, HarmoniqColors.emphasize]),
+              shape: BoxShape.circle,
+              boxShadow: isDark
+                  ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 40, offset: const Offset(0, 10))]
+                  : [BoxShadow(color: const Color(0x4076A8FF), blurRadius: 32, offset: const Offset(0, 14))],
             ),
-            itemBuilder: (context, i) {
-              final isCurrent = i == idx;
-              return SizedBox(
-                height: itemHeight,
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: isCurrent ? 4 : 1),
-                    child: Text(
-                      lines[i].text,
-                      softWrap: true,
-                      textAlign: TextAlign.center,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: isCurrent ? 17 : 14,
-                        fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-                        color: isCurrent ? AppColors.accent : AppColors.muted,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
+            child: Icon(
+              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              size: 36,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        // Next
+        IconButton(
+          icon: Icon(Icons.skip_next_rounded, size: 32,
+              color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary),
+          onPressed: () => notifier.next(),
+        ),
+        // Repeat
+        _SmallBtn(
+          icon: notifier.playMode == 1 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+          selected: notifier.playMode == 1,
+          isDark: isDark,
+          onTap: () => notifier.togglePlayMode(),
+        ),
+      ],
+    );
+  }
+}
+
+class _SmallBtn extends StatelessWidget {
+  final IconData icon;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+  const _SmallBtn({required this.icon, required this.selected, required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: IconButton(
+        icon: Icon(icon, size: 22,
+            color: selected
+                ? (isDark ? AuroraColors.gradientStart : HarmoniqColors.blue)
+                : (isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary)),
+        onPressed: onTap,
       ),
     );
   }

@@ -1,16 +1,46 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
-class AppColors {
-  AppColors._();
+// ═══════════════════════════════════════════
+// Aurora (Dark) – Quiet Luxury
+// ═══════════════════════════════════════════
+class AuroraColors {
+  AuroraColors._();
 
-  static const Color deep = Color(0xFF0A0C10);
-  static const Color surface = Color(0xFF141720);
-  static const Color elevated = Color(0xFF1A1E27);
-  static const Color accent = Color(0xFFD4A853);
-  static const Color accentGlow = Color(0xFFE8C97A);
-  static const Color text = Color(0xFFE8E0D5);
-  static const Color muted = Color(0xFF8B8578);
-  static const Color subtle = Color(0xFF3A3630);
-  static const Color error = Color(0xFFCF6679);
-  static const Color success = Color(0xFF6BBA76);
+  static const Color bgPrimary = Color(0xFF080B14);
+  static const Color bgSecondary = Color(0xFF12141D);
+  static const Color surface = Color(0xFF161A24);
+  static const Color textPrimary = Color(0xFFF7F8FA);
+  static const Color textSecondary = Color(0xFFA4AAB6);
+  static const Color textDisabled = Color(0xFF5B6370);
+  static const Color gradientStart = Color(0xFF6F7CFF);
+  static const Color gradientMid = Color(0xFF9B6DFF);
+  static const Color gradientEnd = Color(0xFFD06FFF);
+  static const Color accent = Color(0xFF44D3FF);
+  static const Color danger = Color(0xFFFF7A9E);
+
+  static const List<Color> gradient = [
+    gradientStart,
+    gradientMid,
+    gradientEnd,
+  ];
+}
+
+// ═══════════════════════════════════════════
+// Harmoniq (Light) – Soft 3D Floating
+// ═══════════════════════════════════════════
+class HarmoniqColors {
+  HarmoniqColors._();
+
+  static const Color bg = Color(0xFFF8F9FC);
+  static const Color card = Color(0xFFFFFFFF);
+  static const Color aux = Color(0xFFEEF2F7);
+  static const Color textPrimary = Color(0xFF202532);
+  static const Color textSecondary = Color(0xFF798294);
+  static const Color blue = Color(0xFF76A8FF);
+  static const Color mint = Color(0xFF78DDBF);
+  static const Color pink = Color(0xFFFF9CC2);
+  static const Color peach = Color(0xFFFFC68A);
+  static const Color emphasize = Color(0xFF9B8BFF);
+
+  static const List<Color> auroraGradient = [blue, mint, pink, peach];
 }

@@ -10,6 +10,15 @@ subprojects {
         extensions.findByType<com.android.build.gradle.BaseExtension>()?.let { ext ->
             ext.compileSdkVersion(36)
         }
+        extensions.findByType<org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension>()?.let { ext ->
+            ext.compilerOptions {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            }
+        }
+        tasks.withType<JavaCompile>().configureEach {
+            sourceCompatibility = JavaVersion.VERSION_17.toString()
+            targetCompatibility = JavaVersion.VERSION_17.toString()
+        }
     }
 }
 

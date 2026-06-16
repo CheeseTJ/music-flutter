@@ -6,6 +6,7 @@ import { uploadRoute } from "./routes/upload";
 import { lyricUploadRoute } from "./routes/lyric_upload";
 import { lyricGetRoute } from "./routes/lyric";
 import { deleteSongRoute } from "./routes/delete_song";
+import { updateSongRoute } from "./routes/update_song";
 
 export interface Env {
   MUSIC_BUCKET: R2Bucket;
@@ -38,6 +39,8 @@ app.get("/sign", async (c) => {
 app.get("/list", listRoute);
 app.get("/play", playRoute);
 app.post("/upload", uploadRoute);
+
+app.put("/song", updateSongRoute);
 
 app.post("/lyric/upload", lyricUploadRoute);
 app.get("/lyric", lyricGetRoute);
