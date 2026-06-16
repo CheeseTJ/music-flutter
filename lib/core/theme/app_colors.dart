@@ -18,6 +18,25 @@ class AuroraColors {
   static const Color accent = Color(0xFF44D3FF);
   static const Color danger = Color(0xFFFF7A9E);
 
+  // ── Gradient getters ──
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [gradientStart, gradientMid, gradientEnd],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient primaryGradientH = LinearGradient(
+    colors: [gradientStart, gradientEnd],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  // ── Legacy aliases (for backwards compatibility) ──
+  static const Color text = textPrimary;
+  static const Color muted = textSecondary;
+  static const Color subtle = textDisabled;
+  static const Color error = danger;
+
   static const List<Color> gradient = [
     gradientStart,
     gradientMid,

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../data/models/song.dart';
-import '../../../features/player/providers/player_provider.dart';
 
 class SongTile extends ConsumerStatefulWidget {
   final Song song;

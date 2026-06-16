@@ -1,0 +1,11 @@
+name = "music-worker"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+APP_SECRET = "junet"
+
+# If you have R2 bucket for song storage, uncomment:
+# [[r2_buckets]]
+# binding = "MUSIC_BUCKET"
+# bucket_name = "music-storage"

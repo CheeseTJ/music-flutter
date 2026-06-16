@@ -14,6 +14,7 @@ class PlayerControls extends ConsumerWidget {
     final state = ref.watch(playerProvider);
     final notifier = ref.watch(playerProvider.notifier);
     final isPlaying = state.isPlaying;
+    final isDark = ref.watch(themeProvider).isDark;
     final playBtnGradient = isDark
         ? const LinearGradient(colors: [AuroraColors.gradientStart, AuroraColors.gradientEnd])
         : const LinearGradient(colors: [HarmoniqColors.blue, HarmoniqColors.emphasize]);

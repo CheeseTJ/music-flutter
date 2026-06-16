@@ -95,6 +95,13 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     letterSpacing: -0.5,
                     color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary,
                   )),
+              const Spacer(),
+              Text('24.7GB / 50GB',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: (isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary).withValues(alpha: 0.7),
+                  )),
 
             ],
           ),
@@ -151,8 +158,11 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                   decoration: BoxDecoration(
                     color: selected
                         ? (isDark ? AuroraColors.gradientStart : HarmoniqColors.blue)
-                        : (isDark ? AuroraColors.bgSecondary : HarmoniqColors.aux),
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
+                    border: selected
+                        ? null
+                        : Border.all(color: isDark ? AuroraColors.bgSecondary : HarmoniqColors.aux, width: 1),
                   ),
                   child: Center(
                     child: Text(

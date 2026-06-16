@@ -33,12 +33,12 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('清除记录', style: TextStyle(color: AppColors.text)),
-        content: const Text('将清除所有播放记录。', style: TextStyle(color: AppColors.muted)),
+        backgroundColor: AuroraColors.bgSecondary,
+        title: const Text('清除记录', style: TextStyle(color: AuroraColors.textPrimary)),
+        content: const Text('将清除所有播放记录。', style: TextStyle(color: AuroraColors.textSecondary)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消', style: TextStyle(color: AppColors.muted))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定', style: TextStyle(color: AppColors.error))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消', style: TextStyle(color: AuroraColors.textSecondary))),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定', style: TextStyle(color: AuroraColors.danger))),
         ],
       ),
     );
@@ -74,9 +74,9 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+          ? const Center(child: CircularProgressIndicator(color: AuroraColors.gradientStart))
           : _records.isEmpty
-              ? const Center(child: Text('暂无播放记录', style: TextStyle(color: AppColors.muted, fontSize: 14)))
+              ? const Center(child: Text('暂无播放记录', style: TextStyle(color: AuroraColors.textSecondary, fontSize: 14)))
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 16),
                   itemCount: _records.length,

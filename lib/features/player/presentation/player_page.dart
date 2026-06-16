@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../data/models/song.dart';
-import '../../../data/models/lrc_parser.dart';
 import '../../../core/network/itunes_cover_service.dart';
 import '../../player/providers/player_provider.dart';
 
@@ -21,11 +20,13 @@ class PlayerPage extends ConsumerStatefulWidget {
 class _PlayerPageState extends ConsumerState<PlayerPage>
     with SingleTickerProviderStateMixin {
   Uint8List? _cover;
+  late final AnimationController _rotateCtrl;
   late final AnimationController _fadeCtrl;
 
   @override
   void initState() {
     super.initState();
+    _rotateCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 20));
     _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
     _fadeCtrl.forward();
     _fetchCover();
@@ -39,6 +40,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   @override
   void dispose() {
+    _rotateCtrl.dispose();
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -54,8 +56,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final notifier = ref.watch(playerProvider.notifier);
     final song = notifier.currentSong ?? widget.song;
     final isPlaying = state.isPlaying;
-    final isDark = ref.watch(themeProvider).isDark;
 
+    if (isPlaying && !_rotateCtrl.isAnimating) {
+      _rotateCtrl.repeat();
+    } else if (!isPlaying && _rotateCtrl.isAnimating) {
+      _rotateCtrl.stop();
+    }
+
+    final isDark = ref.watch(themeProvider).isDark;
     final bg = isDark ? AuroraColors.bgPrimary : HarmoniqColors.bg;
     final textP = isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary;
     final textS = isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary;
@@ -76,7 +84,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
               child: Column(
                 children: [
                   const SizedBox(height: 8),
-                  // Drag indicator
                   Container(
                     width: 40, height: 4,
                     decoration: BoxDecoration(
@@ -86,42 +93,46 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   ),
                   const SizedBox(height: 24),
 
-                  // Album Art (320x320)
+                  // Album Art (320x320) with rotation
                   ScaleTransition(
                     scale: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
-                      child: Container(
-                        width: 320,
-                        height: 320,
-                        decoration: BoxDecoration(
-                          gradient: isDark
-                              ? const LinearGradient(colors: AuroraColors.gradient)
-                              : LinearGradient(
-                                  colors: [HarmoniqColors.blue.withOpacity(0.3), HarmoniqColors.emphasize.withOpacity(0.3)],
-                                ),
-                          borderRadius: BorderRadius.circular(32),
-                          boxShadow: isDark
-                              ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 40, offset: const Offset(0, 10))]
-                              : [
-                                  BoxShadow(color: const Color(0x14283246), blurRadius: 30, offset: const Offset(0, 10)),
-                                ],
-                        ),
-                        child: _cover != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(32),
-                                child: Image.memory(_cover!, fit: BoxFit.cover, width: 320, height: 320),
-                              )
-                            : Center(
-                                child: Icon(Icons.music_note_rounded, size: 80,
-                                    color: isDark ? Colors.white.withOpacity(0.3) : Colors.white),
+                    child: RotationTransition(
+                      turns: _rotateCtrl,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(32),
+                        child: Container(
+                          width: 320,
+                          height: 320,
+                          decoration: BoxDecoration(
+                            gradient: isDark
+                                ? const LinearGradient(colors: AuroraColors.gradient)
+                                : LinearGradient(
+                                    colors: [HarmoniqColors.blue.withValues(alpha: 0.3), HarmoniqColors.emphasize.withValues(alpha: 0.3)],
+                                  ),
+                            borderRadius: BorderRadius.circular(32),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isDark ? Colors.black : const Color(0x14283246)).withValues(alpha: isDark ? 0.12 : 1.0),
+                                blurRadius: isDark ? 40 : 30,
+                                offset: const Offset(0, 10),
                               ),
+                            ],
+                          ),
+                          child: _cover != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(32),
+                                  child: Image.memory(_cover!, fit: BoxFit.cover, width: 320, height: 320),
+                                )
+                              : Center(
+                                  child: Icon(Icons.music_note_rounded, size: 80,
+                                      color: Colors.white.withValues(alpha: 0.3)),
+                                ),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 32),
 
-                  // Song info
                   ScaleTransition(
                     scale: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
                     child: Column(
@@ -136,22 +147,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   ),
                   const SizedBox(height: 24),
 
-                  // Spectrum animation
                   _SpectrumAnimator(isPlaying: isPlaying, isDark: isDark),
                   const SizedBox(height: 20),
 
-                  // Progress Bar
                   _ProgressBar(isDark: isDark),
                   const SizedBox(height: 24),
 
-                  // Controls
                   _PlayerControlsBar(isDark: isDark),
 
                   const SizedBox(height: 16),
 
-                  // Lyrics entry
                   GestureDetector(
-                    onTap: () => context.push('/lyrics', extra: song),
+                    onTap: () => context.push('/player/lyrics', extra: song),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -186,7 +193,6 @@ class _SpectrumAnimator extends StatefulWidget {
 class _SpectrumAnimatorState extends State<_SpectrumAnimator>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  final _rand = Random();
 
   @override
   void initState() {
@@ -214,7 +220,6 @@ class _SpectrumAnimatorState extends State<_SpectrumAnimator>
   @override
   Widget build(BuildContext context) {
     const barCount = 24;
-    final color = widget.isDark ? AuroraColors.gradientStart : HarmoniqColors.blue;
 
     return AnimatedBuilder(
       animation: _ctrl,
@@ -238,7 +243,7 @@ class _SpectrumAnimatorState extends State<_SpectrumAnimator>
                     gradient: LinearGradient(
                       colors: widget.isDark
                           ? [AuroraColors.gradientStart, AuroraColors.gradientEnd]
-                          : [HarmoniqColors.blue.withOpacity(0.6), HarmoniqColors.emphasize],
+                          : [HarmoniqColors.blue.withValues(alpha: 0.6), HarmoniqColors.emphasize],
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                     ),
@@ -282,7 +287,7 @@ class _ProgressBar extends ConsumerWidget {
                     activeTrackColor: activeColor,
                     inactiveTrackColor: inactiveColor,
                     thumbColor: activeColor,
-                    overlayColor: activeColor.withOpacity(0.12),
+                    overlayColor: activeColor.withValues(alpha: 0.12),
                     trackHeight: 3,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                     overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
@@ -335,16 +340,13 @@ class _PlayerControlsBar extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        // Shuffle
         _SmallBtn(icon: Icons.shuffle_rounded, selected: notifier.playMode == 2, isDark: isDark,
             onTap: () => notifier.togglePlayMode()),
-        // Previous
         IconButton(
           icon: Icon(Icons.skip_previous_rounded, size: 32,
               color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary),
           onPressed: () => notifier.previous(),
         ),
-        // Play/Pause (72px)
         GestureDetector(
           onTap: () => notifier.togglePlayPause(),
           child: Container(
@@ -355,9 +357,13 @@ class _PlayerControlsBar extends ConsumerWidget {
                   ? const LinearGradient(colors: [AuroraColors.gradientStart, AuroraColors.gradientEnd])
                   : const LinearGradient(colors: [HarmoniqColors.blue, HarmoniqColors.emphasize]),
               shape: BoxShape.circle,
-              boxShadow: isDark
-                  ? [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 40, offset: const Offset(0, 10))]
-                  : [BoxShadow(color: const Color(0x4076A8FF), blurRadius: 32, offset: const Offset(0, 14))],
+              boxShadow: [
+                BoxShadow(
+                  color: (isDark ? Colors.black : const Color(0x4076A8FF)).withValues(alpha: isDark ? 0.12 : 1.0),
+                  blurRadius: isDark ? 40 : 32,
+                  offset: Offset(0, isDark ? 10.0 : 14.0),
+                ),
+              ],
             ),
             child: Icon(
               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
@@ -366,13 +372,11 @@ class _PlayerControlsBar extends ConsumerWidget {
             ),
           ),
         ),
-        // Next
         IconButton(
           icon: Icon(Icons.skip_next_rounded, size: 32,
               color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary),
           onPressed: () => notifier.next(),
         ),
-        // Repeat
         _SmallBtn(
           icon: notifier.playMode == 1 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
           selected: notifier.playMode == 1,

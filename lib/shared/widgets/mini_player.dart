@@ -39,11 +39,23 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
       onTap: () => context.push('/player', extra: song),
       child: Container(
         height: 68,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AuroraColors.bgSecondary : HarmoniqColors.card,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 40,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               child: _cover != null
                   ? Image.memory(_cover!, width: 48, height: 48, fit: BoxFit.cover)
                   : Container(
@@ -52,7 +64,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                         gradient: isDark
                             ? const LinearGradient(colors: AuroraColors.gradient)
                             : const LinearGradient(colors: [HarmoniqColors.blue, HarmoniqColors.emphasize]),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(Icons.music_note_rounded,
                           color: isDark ? AuroraColors.textPrimary : Colors.white, size: 22),
