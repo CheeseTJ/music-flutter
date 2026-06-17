@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/pearl_colors.dart';
 import '../../../core/utils/playback_history.dart';
 import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
@@ -26,19 +26,33 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
   Future<void> _load() async {
     final records = await PlaybackHistory().all;
     if (!mounted) return;
-    setState(() { _records = records; _loading = false; });
+    setState(() {
+      _records = records;
+      _loading = false;
+    });
   }
 
   Future<void> _clearAll() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AuroraColors.bgSecondary,
-        title: const Text('清除记录', style: TextStyle(color: AuroraColors.textPrimary)),
-        content: const Text('将清除所有播放记录。', style: TextStyle(color: AuroraColors.textSecondary)),
+        backgroundColor: PearlColors.bgSecondary(isDark),
+        title: Text('清除记录',
+            style: TextStyle(color: PearlColors.textPrimary(isDark))),
+        content: Text('将清除所有播放记录。',
+            style: TextStyle(color: PearlColors.textSecondary(isDark))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消', style: TextStyle(color: AuroraColors.textSecondary))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定', style: TextStyle(color: AuroraColors.danger))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('取消',
+                style: TextStyle(color: PearlColors.textSecondary(isDark))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('确定',
+                style: TextStyle(color: PearlColors.accent(isDark))),
+          ),
         ],
       ),
     );
@@ -49,18 +63,20 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
   }
 
   Song _toSong(PlayRecord r) => Song(
-    id: r.songId,
-    title: r.title,
-    artist: r.artist,
-    album: '',
-    format: r.format,
-    duration: r.duration,
-    size: r.size,
-    createdAt: r.playedAt,
-  );
+        id: r.songId,
+        title: r.title,
+        artist: r.artist,
+        album: '',
+        format: r.format,
+        duration: r.duration,
+        size: r.size,
+        createdAt: r.playedAt,
+      );
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('播放记录'),
@@ -74,9 +90,21 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AuroraColors.gradientStart))
+          ? Center(
+              child: CircularProgressIndicator(
+                color: PearlColors.accent(isDark),
+              ),
+            )
           : _records.isEmpty
-              ? const Center(child: Text('暂无播放记录', style: TextStyle(color: AuroraColors.textSecondary, fontSize: 14)))
+              ? Center(
+                  child: Text(
+                    '暂无播放记录',
+                    style: TextStyle(
+                      color: PearlColors.textSecondary(isDark),
+                      fontSize: 14,
+                    ),
+                  ),
+                )
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 16),
                   itemCount: _records.length,

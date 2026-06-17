@@ -1,13 +1,15 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/theme_provider.dart';
+import '../../../core/theme/pearl_colors.dart';
+import '../../../core/theme/pearl_theme.dart';
+import '../../../core/utils/color_extractor.dart';
 import '../../../data/models/song.dart';
 import '../../../core/network/itunes_cover_service.dart';
 import '../../player/providers/player_provider.dart';
+import '../../collection/providers/song_list_provider.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   final Song song;
@@ -18,18 +20,34 @@ class PlayerPage extends ConsumerStatefulWidget {
 }
 
 class _PlayerPageState extends ConsumerState<PlayerPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   Uint8List? _cover;
-  late final AnimationController _rotateCtrl;
+  Color _bgColor = const Color(0xFF7D8CFF);
+  int? _lastSongId;
+  late final AnimationController _bgCtrl;
+  late final AnimationController _lyricCtrl;
   late final AnimationController _fadeCtrl;
+  bool _showLyrics = false;
 
   @override
   void initState() {
     super.initState();
-    _rotateCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 20));
-    _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
+    _bgCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 40),
+    );
+    _lyricCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _bgCtrl.repeat();
     _fadeCtrl.forward();
-    _fetchCover();
+    _fetchCover(widget.song);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final notifier = ref.read(playerProvider.notifier);
       if (notifier.currentSong?.id != widget.song.id) {
@@ -40,14 +58,33 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   @override
   void dispose() {
-    _rotateCtrl.dispose();
+    _bgCtrl.dispose();
+    _lyricCtrl.dispose();
     _fadeCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchCover() async {
-    final bytes = await const ITunesCoverService().fetch(widget.song.title, widget.song.artist);
-    if (mounted) setState(() => _cover = bytes);
+  Future<void> _fetchCover(Song song) async {
+    _lastSongId = song.id;
+    final bytes = await const ITunesCoverService()
+        .fetch(song.title, song.artist);
+    if (mounted && _lastSongId == song.id && bytes != null) {
+      extractDominantColor(bytes).then((c) {
+        if (mounted && _lastSongId == song.id) setState(() => _bgColor = c);
+      });
+      setState(() => _cover = bytes);
+    }
+  }
+
+  void _toggleLyrics() {
+    if (_showLyrics) {
+      _lyricCtrl.reverse().then((_) {
+        if (mounted) setState(() => _showLyrics = false);
+      });
+    } else {
+      setState(() => _showLyrics = true);
+      _lyricCtrl.forward();
+    }
   }
 
   @override
@@ -56,205 +93,174 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final notifier = ref.watch(playerProvider.notifier);
     final song = notifier.currentSong ?? widget.song;
     final isPlaying = state.isPlaying;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final size = MediaQuery.of(context).size;
 
-    if (isPlaying && !_rotateCtrl.isAnimating) {
-      _rotateCtrl.repeat();
-    } else if (!isPlaying && _rotateCtrl.isAnimating) {
-      _rotateCtrl.stop();
+    if (song.id != _lastSongId) {
+      _cover = null;
+      _bgColor = const Color(0xFF7D8CFF);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchCover(song));
     }
-
-    final isDark = ref.watch(themeProvider).isDark;
-    final bg = isDark ? AuroraColors.bgPrimary : HarmoniqColors.bg;
-    final textP = isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary;
-    final textS = isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary;
 
     return FadeTransition(
       opacity: _fadeCtrl,
       child: Scaffold(
-        backgroundColor: bg,
+        backgroundColor: PearlColors.bgPrimary(isDark),
         body: GestureDetector(
           onVerticalDragEnd: (details) {
-            if (details.primaryVelocity != null && details.primaryVelocity! > 500) {
+            if (_showLyrics) {
+              _toggleLyrics();
+              return;
+            }
+            if (details.primaryVelocity != null &&
+                details.primaryVelocity! > 500) {
               Navigator.of(context).pop();
             }
           },
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 40, height: 4,
-                    decoration: BoxDecoration(
-                      color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Album Art (320x320) with rotation
-                  ScaleTransition(
-                    scale: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
-                    child: RotationTransition(
-                      turns: _rotateCtrl,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(32),
-                        child: Container(
-                          width: 320,
-                          height: 320,
-                          decoration: BoxDecoration(
-                            gradient: isDark
-                                ? const LinearGradient(colors: AuroraColors.gradient)
-                                : LinearGradient(
-                                    colors: [HarmoniqColors.blue.withValues(alpha: 0.3), HarmoniqColors.emphasize.withValues(alpha: 0.3)],
-                                  ),
-                            borderRadius: BorderRadius.circular(32),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isDark ? Colors.black : const Color(0x14283246)).withValues(alpha: isDark ? 0.12 : 1.0),
-                                blurRadius: isDark ? 40 : 30,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: _cover != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(32),
-                                  child: Image.memory(_cover!, fit: BoxFit.cover, width: 320, height: 320),
-                                )
-                              : Center(
-                                  child: Icon(Icons.music_note_rounded, size: 80,
-                                      color: Colors.white.withValues(alpha: 0.3)),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  ScaleTransition(
-                    scale: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
-                    child: Column(
-                      children: [
-                        Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: textP, letterSpacing: -0.3)),
-                        const SizedBox(height: 8),
-                        Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 15, color: textS)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  _SpectrumAnimator(isPlaying: isPlaying, isDark: isDark),
-                  const SizedBox(height: 20),
-
-                  _ProgressBar(isDark: isDark),
-                  const SizedBox(height: 24),
-
-                  _PlayerControlsBar(isDark: isDark),
-
-                  const SizedBox(height: 16),
-
-                  GestureDetector(
-                    onTap: () => context.push('/player/lyrics', extra: song),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.lyrics_outlined, size: 18,
-                            color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary),
-                        const SizedBox(width: 6),
-                        Text('Lyrics',
-                            style: TextStyle(fontSize: 14,
-                                color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary)),
-                      ],
-                    ),
-                  ),
-                ],
+          child: Stack(
+            children: [
+              _buildBackground(isDark, size),
+              SafeArea(
+                child: _buildMainContent(isDark, song, isPlaying, notifier, size),
               ),
-            ),
+              if (_showLyrics)
+                _LyricsOverlay(
+                  isDark: isDark,
+                  controller: _lyricCtrl,
+                  song: song,
+                  onDismiss: _toggleLyrics,
+                ),
+            ],
           ),
         ),
       ),
     );
   }
-}
 
-class _SpectrumAnimator extends StatefulWidget {
-  final bool isPlaying;
-  final bool isDark;
-  const _SpectrumAnimator({required this.isPlaying, required this.isDark});
-
-  @override
-  State<_SpectrumAnimator> createState() => _SpectrumAnimatorState();
-}
-
-class _SpectrumAnimatorState extends State<_SpectrumAnimator>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
-    if (widget.isPlaying) _ctrl.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SpectrumAnimator old) {
-    super.didUpdateWidget(old);
-    if (widget.isPlaying && !_ctrl.isAnimating) {
-      _ctrl.repeat();
-    } else if (!widget.isPlaying && _ctrl.isAnimating) {
-      _ctrl.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const barCount = 24;
-
+  Widget _buildBackground(bool isDark, Size size) {
     return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        return SizedBox(
-          height: 40,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: List.generate(barCount, (i) {
-              final heightFactor = widget.isPlaying
-                  ? (0.3 + 0.7 * (0.5 + 0.5 * sin(_ctrl.value * 2 * pi + i * 0.8)))
-                  : 0.2;
-              final barHeight = (4 + 28 * heightFactor).clamp(4.0, 32.0);
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Container(
-                  width: 3,
-                  height: barHeight,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: widget.isDark
-                          ? [AuroraColors.gradientStart, AuroraColors.gradientEnd]
-                          : [HarmoniqColors.blue.withValues(alpha: 0.6), HarmoniqColors.emphasize],
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              );
-            }),
+      animation: _bgCtrl,
+      builder: (context, child) {
+        final t = _bgCtrl.value * 2 * pi;
+        final hsv = HSVColor.fromColor(_bgColor);
+
+        final c1 = hsv
+            .withHue((hsv.hue + sin(t) * 15).clamp(0, 360))
+            .withSaturation((hsv.saturation + cos(t * 1.3) * 0.12).clamp(0, 1))
+            .withValue((hsv.value + sin(t * 0.7) * 0.08).clamp(0, 1))
+            .toColor();
+
+        final c2 = hsv
+            .withHue((hsv.hue + cos(t * 1.7) * 18).clamp(0, 360))
+            .withSaturation((hsv.saturation + sin(t * 0.9) * 0.1).clamp(0, 1))
+            .withValue((hsv.value - 0.1 + cos(t * 1.1) * 0.06).clamp(0, 1))
+            .toColor();
+
+        return Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [c1.withValues(alpha: 0.15), c2.withValues(alpha: 0.08)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMainContent(
+    bool isDark,
+    Song song,
+    bool isPlaying,
+    PlayerController notifier,
+    Size size,
+  ) {
+    final textP = PearlColors.textPrimary(isDark);
+    final textS = PearlColors.textSecondary(isDark);
+    final maxArtworkSize = (size.width * 0.72).clamp(260.0, 360.0);
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: PearlColors.textDisabled(isDark),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const Spacer(),
+
+        Center(
+          child: Container(
+            width: maxArtworkSize,
+            height: maxArtworkSize,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+              boxShadow: [
+                BoxShadow(
+                  color: _bgColor.withValues(alpha: 0.25),
+                  blurRadius: 60,
+                  offset: const Offset(0, 24),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+              child: _cover != null
+                  ? Image.memory(_cover!, fit: BoxFit.cover)
+                  : Container(
+                      decoration: BoxDecoration(
+                        color: PearlColors.glassBg(isDark),
+                        borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+                      ),
+                      child: Center(
+                        child: Icon(Icons.music_note_rounded, size: 80,
+                            color: Colors.white.withValues(alpha: 0.2)),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            song.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: textP,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          song.artist,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 15, color: textS),
+        ),
+
+        const Spacer(flex: 2),
+        _CurrentLyricLine(song: song, isDark: isDark, onTap: _toggleLyrics),
+        const Spacer(flex: 2),
+        _ProgressBar(isDark: isDark),
+        const SizedBox(height: 20),
+        _PlayerControlsBar(isDark: isDark),
+
+        const Spacer(flex: 1),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
@@ -266,8 +272,7 @@ class _ProgressBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.watch(playerProvider.notifier);
-    final activeColor = isDark ? AuroraColors.gradientStart : HarmoniqColors.blue;
-    final inactiveColor = isDark ? AuroraColors.surface : HarmoniqColors.aux;
+    final accent = PearlColors.accent(isDark);
 
     return StreamBuilder<Duration>(
       stream: notifier.player.positionStream,
@@ -278,41 +283,49 @@ class _ProgressBar extends ConsumerWidget {
           builder: (context, durSnap) {
             final duration = durSnap.data ?? Duration.zero;
             final max = duration.inMilliseconds.toDouble();
-            final value = (position.inMilliseconds.toDouble()).clamp(0.0, max > 0 ? max : 1).toDouble();
+            final value = position.inMilliseconds
+                .toDouble()
+                .clamp(0.0, max > 0 ? max : 1.0);
 
-            return Column(
-              children: [
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: activeColor,
-                    inactiveTrackColor: inactiveColor,
-                    thumbColor: activeColor,
-                    overlayColor: activeColor.withValues(alpha: 0.12),
-                    trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: accent,
+                      inactiveTrackColor: PearlColors.bgTertiary(isDark),
+                      thumbColor: accent,
+                      overlayColor: accent.withValues(alpha: 0.12),
+                      trackHeight: 3,
+                      thumbShape:
+                          const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      overlayShape:
+                          const RoundSliderOverlayShape(overlayRadius: 14),
+                    ),
+                    child: Slider(
+                      value: value,
+                      max: max > 0 ? max : 1,
+                      onChanged: (v) =>
+                          notifier.seekTo(Duration(milliseconds: v.toInt())),
+                    ),
                   ),
-                  child: Slider(
-                    value: value,
-                    max: max > 0 ? max : 1,
-                    onChanged: (v) => notifier.seekTo(Duration(milliseconds: v.toInt())),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_fmt(position),
+                            style: TextStyle(fontSize: 12,
+                                color: PearlColors.textSecondary(isDark))),
+                        Text(_fmt(duration),
+                            style: TextStyle(fontSize: 12,
+                                color: PearlColors.textSecondary(isDark))),
+                      ],
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_fmt(position),
-                          style: TextStyle(fontSize: 12,
-                              color: isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary)),
-                      Text(_fmt(duration),
-                          style: TextStyle(fontSize: 12,
-                              color: isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary)),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         );
@@ -336,54 +349,59 @@ class _PlayerControlsBar extends ConsumerWidget {
     final notifier = ref.watch(playerProvider.notifier);
     final state = ref.watch(playerProvider);
     final isPlaying = state.isPlaying;
+    final accent = PearlColors.accent(isDark);
+    final textP = PearlColors.textPrimary(isDark);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _SmallBtn(icon: Icons.shuffle_rounded, selected: notifier.playMode == 2, isDark: isDark,
-            onTap: () => notifier.togglePlayMode()),
-        IconButton(
-          icon: Icon(Icons.skip_previous_rounded, size: 32,
-              color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary),
-          onPressed: () => notifier.previous(),
-        ),
-        GestureDetector(
-          onTap: () => notifier.togglePlayPause(),
-          child: Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              gradient: isDark
-                  ? const LinearGradient(colors: [AuroraColors.gradientStart, AuroraColors.gradientEnd])
-                  : const LinearGradient(colors: [HarmoniqColors.blue, HarmoniqColors.emphasize]),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: (isDark ? Colors.black : const Color(0x4076A8FF)).withValues(alpha: isDark ? 0.12 : 1.0),
-                  blurRadius: isDark ? 40 : 32,
-                  offset: Offset(0, isDark ? 10.0 : 14.0),
-                ),
-              ],
-            ),
-            child: Icon(
-              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              size: 36,
-              color: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _SmallBtn(
+            icon: Icons.shuffle_rounded,
+            selected: notifier.playMode == 2,
+            isDark: isDark,
+            onTap: () => notifier.togglePlayMode(),
+          ),
+          IconButton(
+            icon: Icon(Icons.skip_previous_rounded, size: 32, color: textP),
+            onPressed: () => notifier.previous(),
+          ),
+          GestureDetector(
+            onTap: () => notifier.togglePlayPause(),
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: accent,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                size: 36,
+                color: Colors.white,
+              ),
             ),
           ),
-        ),
-        IconButton(
-          icon: Icon(Icons.skip_next_rounded, size: 32,
-              color: isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary),
-          onPressed: () => notifier.next(),
-        ),
-        _SmallBtn(
-          icon: notifier.playMode == 1 ? Icons.repeat_one_rounded : Icons.repeat_rounded,
-          selected: notifier.playMode == 1,
+          IconButton(
+            icon: Icon(Icons.skip_next_rounded, size: 32, color: textP),
+            onPressed: () => notifier.next(),
+          ),
+          _SmallBtn(
+          icon: Icons.queue_music_rounded,
+          selected: false,
           isDark: isDark,
-          onTap: () => notifier.togglePlayMode(),
+          onTap: () => _showPlaylistSheet(context, ref),
         ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -393,20 +411,411 @@ class _SmallBtn extends StatelessWidget {
   final bool selected;
   final bool isDark;
   final VoidCallback onTap;
-  const _SmallBtn({required this.icon, required this.selected, required this.isDark, required this.onTap});
+  const _SmallBtn({
+    required this.icon,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final accent = PearlColors.accent(isDark);
+    final textS = PearlColors.textSecondary(isDark);
+
     return SizedBox(
       width: 44,
       height: 44,
       child: IconButton(
-        icon: Icon(icon, size: 22,
-            color: selected
-                ? (isDark ? AuroraColors.gradientStart : HarmoniqColors.blue)
-                : (isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary)),
+        icon: Icon(icon, size: 22, color: selected ? accent : textS),
         onPressed: onTap,
       ),
     );
   }
 }
+
+class _CurrentLyricLine extends ConsumerWidget {
+  final Song song;
+  final bool isDark;
+  final VoidCallback onTap;
+  const _CurrentLyricLine({
+    required this.song,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(playerProvider);
+    final notifier = ref.watch(playerProvider.notifier);
+    final textS = PearlColors.textSecondary(isDark);
+    final accent = PearlColors.accent(isDark);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: StreamBuilder<Duration>(
+          stream: notifier.player.positionStream,
+          builder: (context, snapshot) {
+            if (state.lyricLoading) {
+              return Center(
+                child: Text('加载歌词中...',
+                    style: TextStyle(fontSize: 14, color: textS)),
+              );
+            }
+
+            final lyric = notifier.lyric;
+            if (lyric == null || lyric.lines.isEmpty) {
+              return Center(
+                child: Text('暂无歌词',
+                    style: TextStyle(fontSize: 14, color: textS)),
+              );
+            }
+
+            final position = snapshot.data ?? Duration.zero;
+            final idx = lyric.findIndex(position);
+
+            final lines = <_LyricLineEntry>[];
+            for (var i = -2; i <= 2; i++) {
+              final lineIdx = idx + i;
+              if (lineIdx >= 0 && lineIdx < lyric.lines.length) {
+                lines.add(_LyricLineEntry(
+                  text: lyric.lines[lineIdx].text,
+                  isCurrent: i == 0,
+                ));
+              }
+            }
+            if (lines.isEmpty) {
+              lines.add(const _LyricLineEntry(text: '...', isCurrent: true));
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: List.generate(lines.length, (i) {
+                final entry = lines[i];
+                return Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+                  child: Text(
+                    entry.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: entry.isCurrent ? 18 : 14,
+                      fontWeight: entry.isCurrent ? FontWeight.w600 : FontWeight.w400,
+                      color: entry.isCurrent ? accent : textS,
+                      height: 1.5,
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _LyricLineEntry {
+  final String text;
+  final bool isCurrent;
+  const _LyricLineEntry({required this.text, required this.isCurrent});
+}
+
+class _LyricsOverlay extends ConsumerStatefulWidget {
+  final bool isDark;
+  final AnimationController controller;
+  final Song song;
+  final VoidCallback onDismiss;
+  const _LyricsOverlay({
+    required this.isDark,
+    required this.controller,
+    required this.song,
+    required this.onDismiss,
+  });
+
+  @override
+  ConsumerState<_LyricsOverlay> createState() => _LyricsOverlayState();
+}
+
+class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
+  final ScrollController _scrollCtrl = ScrollController();
+  int _lastIdx = -1;
+  bool _entering = true;
+  static const double _kItemHeight = 56;
+
+  void _scrollTo(int idx) {
+    if (!_scrollCtrl.hasClients || idx < 0) return;
+    final vp = _scrollCtrl.position.viewportDimension;
+    final target = (idx * _kItemHeight) - vp / 2 + _kItemHeight / 2;
+    final clamped = target.clamp(0.0, _scrollCtrl.position.maxScrollExtent);
+    if (_entering) {
+      _entering = false;
+      _scrollCtrl.jumpTo(clamped);
+    } else {
+      _scrollCtrl.animateTo(clamped,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final notifier = ref.watch(playerProvider.notifier);
+    final lyric = notifier.lyric;
+    final isDark = widget.isDark;
+    final accent = PearlColors.accent(isDark);
+    final textS = PearlColors.textSecondary(isDark);
+    final textD = PearlColors.textDisabled(isDark);
+    final statusBarHeight = MediaQuery.of(context).padding.top;
+
+    final slideAnim = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: widget.controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    ));
+
+    return Positioned(
+      top: statusBarHeight, left: 0, right: 0, bottom: 0,
+      child: SlideTransition(
+        position: slideAnim,
+        child: GestureDetector(
+          onVerticalDragEnd: (details) {
+            if (details.primaryVelocity != null &&
+                details.primaryVelocity! > 300) {
+              widget.onDismiss();
+            }
+          },
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: PearlColors.glassBgStrong(isDark),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                ),
+                child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 8),
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: PearlColors.textDisabled(isDark),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  if (lyric == null || lyric.lines.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lyrics_outlined, size: 56, color: textD),
+                            const SizedBox(height: 16),
+                            Text('暂无歌词', style: TextStyle(color: textS, fontSize: 16)),
+                            if (widget.song.hasLyric)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text('纯音乐，请欣赏',
+                                    style: TextStyle(color: textD, fontSize: 13)),
+                              ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: StreamBuilder<Duration>(
+                        stream: notifier.player.positionStream,
+                        builder: (context, snapshot) {
+                          final idx = lyric.findIndex(snapshot.data ?? Duration.zero);
+                          if (idx != _lastIdx && idx >= 0) {
+                            _lastIdx = idx;
+                            WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(idx));
+                          }
+                          return ListView.builder(
+                            controller: _scrollCtrl,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            itemCount: lyric.lines.length,
+                            itemBuilder: (context, i) {
+                              final isCurrent = i == idx;
+                              return SizedBox(
+                                height: _kItemHeight,
+                                child: Center(
+                                  child: AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 220),
+                                    style: TextStyle(
+                                      fontSize: isCurrent ? 20 : 15,
+                                      fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
+                                      color: isCurrent ? accent : textS,
+                                      letterSpacing: 0.3,
+                                    ),
+                                    child: Text(
+                                      lyric.lines[i].text,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
+  final notifier = ref.read(playerProvider.notifier);
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  final songs = ref.read(songListProvider).valueOrNull ?? [];
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      final bottomInset = MediaQuery.of(ctx).padding.bottom;
+      return Container(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+        decoration: BoxDecoration(
+          color: PearlColors.glassBgStrong(isDark),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: PearlColors.textDisabled(isDark),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                '播放列表',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: PearlColors.textPrimary(isDark),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 320,
+                child: songs.isEmpty
+                    ? Center(
+                        child: Text('暂无歌曲',
+                            style: TextStyle(color: PearlColors.textSecondary(isDark))))
+                    : ListView.builder(
+                        itemCount: songs.length,
+                        itemBuilder: (_, i) {
+                          final song = songs[i];
+                          final isCurrent = notifier.currentSong?.id == song.id;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Material(
+                              color: isCurrent
+                                  ? PearlColors.accent(isDark).withValues(alpha: 0.08)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  notifier.play(song);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isCurrent ? Icons.music_note_rounded : Icons.music_note_outlined,
+                                        size: 18,
+                                        color: isCurrent
+                                            ? PearlColors.accent(isDark)
+                                            : PearlColors.textDisabled(isDark),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              song.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: isCurrent
+                                                    ? PearlColors.accent(isDark)
+                                                    : PearlColors.textPrimary(isDark),
+                                              ),
+                                            ),
+                                            Text(
+                                              song.artist,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: PearlColors.textSecondary(isDark),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        song.durationFormatted,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: PearlColors.textDisabled(isDark),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+

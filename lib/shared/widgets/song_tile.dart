@@ -1,10 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/theme_provider.dart';
-import '../../../data/models/song.dart';
-import '../../../core/network/itunes_cover_service.dart';
+import '../../core/theme/pearl_colors.dart';
+import '../../core/theme/pearl_theme.dart';
+import '../../data/models/song.dart';
+import '../../core/network/itunes_cover_service.dart';
 
 class SongTile extends ConsumerStatefulWidget {
   final Song song;
@@ -42,12 +42,13 @@ class _SongTileState extends ConsumerState<SongTile> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = ref.watch(themeProvider).isDark;
-    final textP = isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary;
-    final textS = isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textP = PearlColors.textPrimary(isDark);
+    final textS = PearlColors.textSecondary(isDark);
+    final textD = PearlColors.textDisabled(isDark);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -55,17 +56,15 @@ class _SongTileState extends ConsumerState<SongTile> {
           onLongPress: widget.onLongPress,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            height: 80,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            height: 68,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
-                // Cover
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(PearlTheme.radiusSm),
                   child: _buildCover(isDark),
                 ),
-                const SizedBox(width: 14),
-                // Info
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -77,27 +76,25 @@ class _SongTileState extends ConsumerState<SongTile> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: textP,
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         '${widget.song.artist} · ${widget.song.durationFormatted}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: textS, fontSize: 13),
+                        style: TextStyle(color: textS, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
                 if (!widget.song.hasLyric)
-                  Icon(Icons.lyrics_outlined, size: 16,
-                      color: (isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary).withValues(alpha: 0.5)),
-                const SizedBox(width: 8),
-                Icon(Icons.more_horiz_rounded, size: 18,
-                    color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary),
+                  Icon(Icons.lyrics_outlined, size: 13, color: textD),
+                const SizedBox(width: 6),
+                Icon(Icons.more_horiz_rounded, size: 15, color: textD),
               ],
             ),
           ),
@@ -107,20 +104,20 @@ class _SongTileState extends ConsumerState<SongTile> {
   }
 
   Widget _buildCover(bool isDark) {
+    final accent = PearlColors.accent(isDark);
+
     if (_cover != null) {
-      return Image.memory(_cover!, width: 52, height: 52, fit: BoxFit.cover);
+      return Image.memory(_cover!, width: 56, height: 56, fit: BoxFit.cover);
     }
     return Container(
-      width: 52, height: 52,
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
-        gradient: isDark
-            ? const LinearGradient(colors: AuroraColors.gradient)
-            : const LinearGradient(colors: [HarmoniqColors.blue, HarmoniqColors.emphasize]),
-        borderRadius: BorderRadius.circular(14),
+        color: accent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(PearlTheme.radiusSm),
       ),
       child: Center(
-        child: Icon(Icons.music_note_rounded, size: 24,
-            color: isDark ? AuroraColors.textSecondary : Colors.white70),
+        child: Icon(Icons.music_note_rounded, size: 24, color: accent.withValues(alpha: 0.5)),
       ),
     );
   }

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/pearl_colors.dart';
 import '../../../shared/widgets/floating_tab_bar.dart';
 import '../../../shared/widgets/mini_player.dart';
 import '../../player/providers/player_provider.dart';
-import '../../../core/theme/theme_provider.dart';
 
 class ShellPage extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -14,48 +15,51 @@ class ShellPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.watch(playerProvider.notifier);
     final hasSong = notifier.currentSong != null;
-    final isDark = ref.watch(themeProvider).isDark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: Column(
+    final overlayStyle = SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    );
+
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: Scaffold(
+        backgroundColor: PearlColors.bgPrimary(isDark),
+        extendBody: true,
+        body: Stack(
           children: [
-            Expanded(child: navigationShell),
-            if (hasSong) const MiniPlayer(),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom > 0
-              ? 0
-              : 8,
-        ),
-        child: SizedBox(
-          height: 86 + 16 + 8,
-          child: Stack(
-            alignment: Alignment.topCenter,
-            children: [
-              Positioned(
-                bottom: 0,
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width,
-                  child: FloatingTabBar(
-                    currentIndex: navigationShell.currentIndex,
-                    isDark: isDark,
-                    onTap: (index) {
-                      navigationShell.goBranch(
-                        index,
-                        initialLocation: index == navigationShell.currentIndex,
-                      );
-                    },
-                  ),
-                ),
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(top: topPadding),
+                child: navigationShell,
               ),
-            ],
-          ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 72 + 20 + MediaQuery.of(context).padding.bottom + 12,
+              child: hasSong ? const MiniPlayer() : const SizedBox.shrink(),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: FloatingTabBar(
+                currentIndex: navigationShell.currentIndex,
+                onTap: (index) {
+                  navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

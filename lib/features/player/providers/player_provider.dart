@@ -4,10 +4,10 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../../data/models/song.dart';
+import '../../../core/audio/audio_player_handler.dart';
 import '../../../data/models/lrc_parser.dart';
 import '../../../data/datasources/remote/api_client.dart';
 import '../../../core/network/itunes_cover_service.dart';
-import '../../../core/audio/audio_player_handler.dart';
 
 enum PlayerPhase { idle, loading, playing, paused, error }
 
@@ -81,7 +81,6 @@ class PlayerController extends StateNotifier<PlayerState> {
   int get currentLyricIndex => _currentLyricIndex;
   bool get lyricLoading => state.lyricLoading;
   bool get lyricFailed => state.lyricFailed;
-
   void setPlaylist(List<Song> songs) {
     _playlist = songs;
   }
@@ -239,6 +238,43 @@ class PlayerController extends StateNotifier<PlayerState> {
     } else if (_playMode == 0) {
       _currentIndex = _playlist.length - 1;
       await play(_playlist[_currentIndex]);
+    }
+  }
+
+  Future<void> playUrl(String url, String title, String artist) async {
+    try {
+      state = PlayerState.loading();
+      _currentSong = null;
+      _lyric = null;
+      _currentLyricIndex = -1;
+
+      await _handler.loadSong(
+        url: url,
+        id: '',
+        title: title,
+        artist: artist,
+      );
+      await _handler.play();
+      state = PlayerState.playing();
+
+      _positionSub?.cancel();
+      _durationSub?.cancel();
+      _completeSub?.cancel();
+      _playingSub?.cancel();
+      _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
+      _durationSub = _handler.player.durationStream.listen((_) {});
+      _playingSub = _handler.player.playingStream.listen((playing) {
+        if (!playing && state.isPlaying) {
+          state = PlayerState.paused();
+        }
+      });
+      _completeSub = _handler.player.playerStateStream.listen((ps) {
+        if (ps.processingState == ProcessingState.completed) {
+          onSongEnd();
+        }
+      });
+    } catch (e) {
+      state = PlayerState.error();
     }
   }
 

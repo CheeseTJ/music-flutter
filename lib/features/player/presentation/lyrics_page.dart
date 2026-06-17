@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/theme_provider.dart';
+import '../../../core/theme/pearl_colors.dart';
 import '../../../data/models/song.dart';
 import '../../player/providers/player_provider.dart';
 
@@ -36,18 +35,16 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(playerProvider);
     final notifier = ref.watch(playerProvider.notifier);
     final lyric = notifier.lyric;
 
-    final isDark = ref.watch(themeProvider).isDark;
-    final bg = isDark ? AuroraColors.bgPrimary : HarmoniqColors.bg;
-    final textP = isDark ? AuroraColors.textPrimary : HarmoniqColors.textPrimary;
-    final textS = isDark ? AuroraColors.textSecondary : HarmoniqColors.textSecondary;
-    final accent = isDark ? AuroraColors.gradientStart : HarmoniqColors.blue;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textP = PearlColors.textPrimary(isDark);
+    final textS = PearlColors.textSecondary(isDark);
+    final accent = PearlColors.accent(isDark);
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: PearlColors.bgPrimary(isDark),
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.keyboard_arrow_down_rounded, size: 28,
@@ -67,7 +64,7 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.lyrics_outlined, size: 56,
-                        color: isDark ? AuroraColors.textDisabled : HarmoniqColors.textSecondary),
+                        color: PearlColors.textDisabled(isDark)),
                     const SizedBox(height: 16),
                     Text('No lyrics available',
                         style: TextStyle(color: textS, fontSize: 16)),

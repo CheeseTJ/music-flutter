@@ -1,0 +1,538 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/pearl_colors.dart';
+import '../../../core/theme/pearl_theme.dart';
+import '../../../data/models/song.dart';
+import '../../../shared/widgets/song_tile.dart';
+import '../../collection/providers/song_list_provider.dart';
+import '../../player/providers/player_provider.dart';
+
+enum FilterOption { all, noLyric, duplicates, sortByName, recent }
+
+class CollectionPage extends ConsumerStatefulWidget {
+  const CollectionPage({super.key});
+
+  @override
+  ConsumerState<CollectionPage> createState() => _CollectionPageState();
+}
+
+class _CollectionPageState extends ConsumerState<CollectionPage> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  bool _refreshing = false;
+  FilterOption _filter = FilterOption.all;
+  String _greetingText = '';
+  Timer? _greetingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateGreeting();
+    _scheduleGreetingRefresh();
+  }
+
+  @override
+  void dispose() {
+    _greetingTimer?.cancel();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _updateGreeting() {
+    final hour = DateTime.now().hour;
+    setState(() {
+      if (hour < 12) {
+        _greetingText = 'Good Morning';
+      } else if (hour < 18) {
+        _greetingText = 'Good Afternoon';
+      } else {
+        _greetingText = 'Good Evening';
+      }
+    });
+  }
+
+  void _scheduleGreetingRefresh() {
+    _greetingTimer?.cancel();
+    final now = DateTime.now();
+    int nextHour;
+    if (now.hour < 12) {
+      nextHour = 12;
+    } else if (now.hour < 18) {
+      nextHour = 18;
+    } else {
+      nextHour = 24;
+    }
+    final next = DateTime(now.year, now.month, now.day, nextHour);
+    final delay = next.difference(now).inSeconds + 1;
+    _greetingTimer = Timer(Duration(seconds: delay), () {
+      _updateGreeting();
+      _scheduleGreetingRefresh();
+    });
+  }
+
+  Future<void> _doRefresh(WidgetRef ref) async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    await ref.read(songListProvider.notifier).load();
+    if (mounted) setState(() => _refreshing = false);
+  }
+
+  List<Song> _applyFilter(List<Song> songs) {
+    var filtered = List<Song>.from(songs);
+
+    switch (_filter) {
+      case FilterOption.all:
+        break;
+      case FilterOption.noLyric:
+        filtered = filtered.where((s) => !s.hasLyric).toList();
+        break;
+      case FilterOption.duplicates:
+        final counts = <String, int>{};
+        for (final s in filtered) {
+          final key = '${s.title.toLowerCase()}|${s.artist.toLowerCase()}';
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+        filtered = filtered.where((s) {
+          final key = '${s.title.toLowerCase()}|${s.artist.toLowerCase()}';
+          return (counts[key] ?? 0) >= 2;
+        }).toList();
+        break;
+      case FilterOption.sortByName:
+        filtered.sort((a, b) => a.title.compareTo(b.title));
+        break;
+      case FilterOption.recent:
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+    }
+
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      filtered = filtered.where((s) =>
+          s.title.toLowerCase().contains(q) ||
+          s.artist.toLowerCase().contains(q) ||
+          s.album.toLowerCase().contains(q)).toList();
+    }
+
+    return filtered;
+  }
+
+  void _playAll(List<Song> songs, WidgetRef ref) {
+    if (songs.isEmpty) return;
+    final notifier = ref.read(playerProvider.notifier);
+    notifier.setPlaylist(songs);
+    notifier.play(songs.first);
+    context.push('/player', extra: songs.first);
+  }
+
+  String get _filterLabel {
+    switch (_filter) {
+      case FilterOption.noLyric:
+        return '缺歌词';
+      case FilterOption.duplicates:
+        return '重名筛查';
+      case FilterOption.sortByName:
+        return '按名称';
+      case FilterOption.recent:
+        return '最近';
+      default:
+        return '';
+    }
+  }
+
+  bool get _hasActiveFilter => _filter != FilterOption.all;
+
+  @override
+  Widget build(BuildContext context) {
+    final songsAsync = ref.watch(songListProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_greetingText,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        color: PearlColors.textPrimary(isDark),
+                      )),
+                  const SizedBox(height: 2),
+                  Text('Your Collection',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: PearlColors.textSecondary(isDark),
+                      )),
+                ],
+              ),
+              const Spacer(),
+              // Filter popup
+              PopupMenuButton<FilterOption>(
+                offset: const Offset(0, 44),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                color: PearlColors.glassBgStrong(isDark),
+                icon: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _hasActiveFilter
+                        ? PearlColors.accent(isDark).withValues(alpha: 0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.filter_list_rounded,
+                          size: 18,
+                          color: _hasActiveFilter
+                              ? PearlColors.accent(isDark)
+                              : PearlColors.textSecondary(isDark)),
+                      if (_hasActiveFilter) ...[
+                        const SizedBox(width: 4),
+                        Text(_filterLabel,
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w500,
+                                color: PearlColors.accent(isDark))),
+                      ],
+                    ],
+                  ),
+                ),
+                onSelected: (f) => setState(() => _filter = f),
+                itemBuilder: (_) => [
+                  _buildFilterItem(context, '默认', FilterOption.all, Icons.format_list_bulleted_rounded, isDark),
+                  _buildFilterItem(context, '缺歌词', FilterOption.noLyric, Icons.lyrics_outlined, isDark),
+                  _buildFilterItem(context, '重名筛查', FilterOption.duplicates, Icons.content_copy_rounded, isDark),
+                  _buildFilterItem(context, '按名称排序', FilterOption.sortByName, Icons.sort_by_alpha_rounded, isDark),
+                  _buildFilterItem(context, '最近添加', FilterOption.recent, Icons.access_time_rounded, isDark),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Search
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: SizedBox(
+            height: 52,
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _query = v),
+              decoration: InputDecoration(
+                hintText: '搜索歌曲...',
+                prefixIcon: Icon(Icons.search_rounded, size: 20,
+                    color: PearlColors.textDisabled(isDark)),
+                filled: true,
+                fillColor: PearlColors.glassBg(isDark),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(PearlTheme.radiusMd),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: TextStyle(
+                fontSize: 14,
+                color: PearlColors.textPrimary(isDark),
+              ),
+            ),
+          ),
+        ),
+        // Song count + play all button
+        songsAsync.when(
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+          data: (songs) {
+            final filtered = _applyFilter(songs);
+            if (filtered.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Row(
+                children: [
+                  Text(
+                    _filter == FilterOption.sortByName ? 'A-Z · ${filtered.length} 首' : '共 ${filtered.length} 首',
+                    style: TextStyle(fontSize: 12, color: PearlColors.textSecondary(isDark)),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => _playAll(FilterOption.all == _filter ? songs : filtered, ref),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: PearlColors.accent(isDark).withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.playlist_play_rounded, size: 14, color: PearlColors.accent(isDark)),
+                          const SizedBox(width: 4),
+                          Text('Play All',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                                  color: PearlColors.accent(isDark))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 2),
+        // Music List
+        Expanded(
+          child: songsAsync.when(
+            loading: () => Center(
+              child: SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: PearlColors.accent(isDark),
+                ),
+              ),
+            ),
+            error: (e, _) => _ErrorView(isDark: isDark, onRetry: () => ref.read(songListProvider.notifier).load()),
+            data: (songs) {
+              final filtered = _applyFilter(songs);
+              if (filtered.isEmpty) {
+                return _EmptyView(hasSearch: _query.isNotEmpty, isDark: isDark);
+              }
+              return RefreshIndicator(
+                color: PearlColors.accent(isDark),
+                backgroundColor: PearlColors.glassBgStrong(isDark),
+                onRefresh: () => _doRefresh(ref),
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    bottom: 72 + 20 + MediaQuery.of(context).padding.bottom + 24),
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) {
+                    final song = filtered[i];
+                    return SongTile(
+                      song: song,
+                      onTap: () {
+                        ref.read(playerProvider.notifier).setPlaylist(songs);
+                        context.push('/player', extra: song);
+                      },
+                      onLongPress: () => _showSongMenu(context, ref, song),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  PopupMenuItem<FilterOption> _buildFilterItem(BuildContext context, String label, FilterOption value, IconData icon, bool isDark) {
+    final selected = _filter == value;
+    return PopupMenuItem<FilterOption>(
+      height: 40,
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: selected
+              ? PearlColors.accent(isDark)
+              : PearlColors.textSecondary(isDark)),
+          const SizedBox(width: 10),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 14,
+                  color: selected
+                      ? PearlColors.accent(isDark)
+                      : PearlColors.textPrimary(isDark),
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
+          const Spacer(),
+          if (selected) Icon(Icons.check_rounded, size: 18,
+              color: PearlColors.accent(isDark)),
+        ],
+      ),
+    );
+  }
+}
+
+void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
+  final notifier = ref.read(playerProvider.notifier);
+  final isCurrentSong = notifier.currentSong?.id == song.id;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      final hasSong = ref.read(playerProvider.notifier).currentSong != null;
+      final extraBottom = (72 + 20 + (hasSong ? 68 + 8 : 0)).toDouble();
+      return Container(
+        padding: EdgeInsets.fromLTRB(20, 12, 20, extraBottom),
+        decoration: BoxDecoration(
+          color: PearlColors.glassBgStrong(isDark),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4,
+                  decoration: BoxDecoration(color: PearlColors.textDisabled(isDark), borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              Text(song.title,
+                  style: TextStyle(color: PearlColors.textPrimary(isDark), fontSize: 17, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('${song.artist} · ${song.durationFormatted}',
+                  style: TextStyle(color: PearlColors.textSecondary(isDark), fontSize: 13)),
+              const SizedBox(height: 16),
+              if (isCurrentSong)
+                _MenuTile(
+                  icon: notifier.player.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  label: notifier.player.playing ? '暂停' : '播放',
+                  color: PearlColors.accent(isDark),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    notifier.togglePlayPause();
+                  },
+                ),
+              if (!song.hasLyric)
+                _MenuTile(
+                  icon: Icons.lyrics_outlined,
+                  label: '上传歌词',
+                  color: PearlColors.accent(isDark),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                  },
+                ),
+              _MenuTile(
+                icon: Icons.delete_outline_rounded,
+                label: '删除歌曲',
+                color: const Color(0xFFFF7A9E),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await ref.read(songListProvider.notifier).removeSong(song.id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _MenuTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _MenuTile({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 20, color: color),
+                const SizedBox(width: 12),
+                Text(label, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyView extends StatelessWidget {
+  final bool hasSearch;
+  final bool isDark;
+  const _EmptyView({required this.hasSearch, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(hasSearch ? Icons.search_off_rounded : Icons.headphones_rounded,
+              size: 56,
+              color: PearlColors.textDisabled(isDark)),
+          const SizedBox(height: 16),
+          Text(hasSearch ? '没有找到匹配的歌曲' : '还没有歌曲',
+              style: TextStyle(
+                fontSize: 16,
+                color: PearlColors.textSecondary(isDark),
+              )),
+          const SizedBox(height: 6),
+          Text(hasSearch ? '换个关键词试试' : '上传你的第一首歌吧',
+              style: TextStyle(
+                fontSize: 13,
+                color: PearlColors.textDisabled(isDark),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onRetry;
+  const _ErrorView({required this.isDark, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 56,
+              color: const Color(0xFFFF7A9E)),
+          const SizedBox(height: 16),
+          Text('加载失败',
+              style: TextStyle(
+                fontSize: 16,
+                color: PearlColors.textSecondary(isDark),
+              )),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: onRetry,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: PearlColors.accent(isDark),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            child: const Text('重试'),
+          ),
+        ],
+      ),
+    );
+  }
+}

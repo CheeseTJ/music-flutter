@@ -1,12 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/models/song.dart';
-import '../../features/home/presentation/home_page.dart';
+import '../../features/collection/presentation/home_page.dart';
 import '../../features/player/presentation/player_page.dart';
 import '../../features/player/presentation/lyrics_page.dart';
-import '../../features/upload/presentation/upload_page.dart';
-import '../../features/profile/presentation/profile_page.dart';
-import '../../features/search/presentation/search_page.dart';
+import '../../features/import/presentation/upload_page.dart';
+import '../../features/import/presentation/search_page.dart';
+import '../../features/vault/presentation/profile_page.dart';
+import '../../features/history/presentation/history_page.dart';
 import '../../features/shell/presentation/shell_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -20,17 +21,17 @@ final appRouter = GoRouter(
         return ShellPage(navigationShell: navigationShell);
       },
       branches: [
-        // Library tab (index 0)
+        // Collection tab (index 0)
         StatefulShellBranch(routes: [
-          GoRoute(path: '/', builder: (_, __) => const LibraryPage()),
+          GoRoute(path: '/', builder: (_, __) => const CollectionPage()),
         ]),
-        // Upload tab (index 1)
+        // Import tab (index 1)
         StatefulShellBranch(routes: [
-          GoRoute(path: '/upload', builder: (_, __) => const UploadPage()),
+          GoRoute(path: '/import', builder: (_, __) => const ImportPage()),
         ]),
-        // Me tab (index 2)
+        // Vault tab (index 2)
         StatefulShellBranch(routes: [
-          GoRoute(path: '/me', builder: (_, __) => const MePage()),
+          GoRoute(path: '/vault', builder: (_, __) => const VaultPage()),
         ]),
       ],
     ),
@@ -60,7 +61,7 @@ final appRouter = GoRouter(
     ),
     // Lyrics (full-screen from Now Playing)
     GoRoute(
-      path: '/lyrics',
+      path: '/player/lyrics',
       parentNavigatorKey: _rootKey,
       pageBuilder: (context, state) {
         final song = state.extra as Song;
@@ -68,8 +69,37 @@ final appRouter = GoRouter(
           key: state.pageKey,
           child: LyricsPage(song: song),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: animation,
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
+              child: child,
+            );
+          },
+        );
+      },
+    ),
+    // Play History
+    GoRoute(
+      path: '/history',
+      parentNavigatorKey: _rootKey,
+      pageBuilder: (context, state) {
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: const PlayHistoryPage(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+              )),
               child: child,
             );
           },
@@ -78,12 +108,12 @@ final appRouter = GoRouter(
     ),
     // Online Search
     GoRoute(
-      path: '/search',
+      path: '/import/search',
       parentNavigatorKey: _rootKey,
       pageBuilder: (context, state) {
         return CustomTransitionPage(
           key: state.pageKey,
-          child: const SearchPage(),
+          child: const InternetSearchPage(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
               position: Tween<Offset>(
