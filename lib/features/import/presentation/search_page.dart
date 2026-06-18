@@ -13,54 +13,46 @@ import 'package:music_app/shared/widgets/mini_player.dart';
 
 enum _SearchSource {
   netease,
-  qq,
   kuwo,
   kugou;
 
   String get label {
     switch (this) {
-      case _SearchSource.netease:
-        return '\u7f51\u6613\u4e91';
-      case _SearchSource.qq:
-        return 'QQ';
-      case _SearchSource.kuwo: return '\u9177\u6211';
-      case _SearchSource.kugou: return '\u9177\u72d7';
+      case _SearchSource.netease: return '\u7f51\u6613\u4e91';
+      case _SearchSource.kuwo:   return '\u9177\u6211';
+      case _SearchSource.kugou:  return '\u9177\u72d7';
     }
   }
 
   IconData get icon {
     switch (this) {
       case _SearchSource.netease: return Icons.cloud_rounded;
-      case _SearchSource.qq: return Icons.chat_bubble_outline_rounded;
-      case _SearchSource.kuwo: return Icons.headphones_rounded;
-      case _SearchSource.kugou: return Icons.surround_sound_rounded;
+      case _SearchSource.kuwo:   return Icons.headphones_rounded;
+      case _SearchSource.kugou:  return Icons.surround_sound_rounded;
     }
   }
 
   Color color(bool isDark) {
     switch (this) {
       case _SearchSource.netease: return const Color(0xFFEC4141);
-      case _SearchSource.qq: return const Color(0xFF31C27C);
-      case _SearchSource.kuwo: return const Color(0xFFFFCC00);
-      case _SearchSource.kugou: return const Color(0xFF2D8CF0);
+      case _SearchSource.kuwo:   return const Color(0xFFFFCC00);
+      case _SearchSource.kugou:  return const Color(0xFF2D8CF0);
     }
   }
 
   String get platformKey {
     switch (this) {
       case _SearchSource.netease: return 'netease';
-      case _SearchSource.qq: return 'qq';
-      case _SearchSource.kuwo: return 'kuwo';
-      case _SearchSource.kugou: return 'kugou';
+      case _SearchSource.kuwo:   return 'kuwo';
+      case _SearchSource.kugou:  return 'kugou';
     }
   }
 
   Widget platformIcon(double size) {
     final asset = switch (this) {
       _SearchSource.netease => 'assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg',
-      _SearchSource.qq => 'assets/icons/QQ\u97f3\u4e50.svg',
-      _SearchSource.kuwo => 'assets/icons/kuwo.svg',
-      _SearchSource.kugou => 'assets/icons/\u9177\u72d7.svg',
+      _SearchSource.kuwo   => 'assets/icons/kuwo.svg',
+      _SearchSource.kugou  => 'assets/icons/\u9177\u72d7.svg',
     };
     return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
   }

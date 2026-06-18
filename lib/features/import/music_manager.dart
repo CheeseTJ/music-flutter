@@ -14,10 +14,9 @@ class MusicManager {
     },
   ));
 
-  late final MusicProvider _mTencent, _mNetease, _mKuwo, _mKugou;
+  late final MusicProvider _mNetease, _mKuwo, _mKugou;
 
   MusicManager() {
-    _mTencent = MetingProvider(_dio, server: 'tencent');
     _mNetease = MetingProvider(_dio, server: 'netease');
     _mKuwo    = MetingProvider(_dio, server: 'kuwo');
     _mKugou   = MetingProvider(_dio, server: 'kugou');
@@ -26,7 +25,6 @@ class MusicManager {
   /// 搜索
   Future<List<Song>> search(String platform, String keyword, {int num = 20}) async {
     final p = switch (platform) {
-      'qq' => _mTencent,
       'netease' => _mNetease,
       'kuwo' => _mKuwo,
       'kugou' => _mKugou,
@@ -36,7 +34,7 @@ class MusicManager {
 
     try {
       final results = await p.search(keyword, num: num);
-      // 归一化 platform，避免 meting_tencent 等前缀
+      // 归一化 platform 名称
       return results.map((s) => Song(
         platform: platform,
         source: 'meting',
@@ -55,7 +53,6 @@ class MusicManager {
   /// 取播放链接
   Future<SongUrl?> getUrl(Song song, {String quality = 'sq'}) async {
     final p = switch (song.platform) {
-      'qq' => _mTencent,
       'netease' => _mNetease,
       'kuwo' => _mKuwo,
       'kugou' => _mKugou,

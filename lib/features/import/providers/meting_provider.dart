@@ -64,14 +64,16 @@ class MetingProvider implements MusicProvider {
       final lrcResp = results[1];
 
       String? url;
+      String? reason;
       if (urlResp.data is Map) {
         url = urlResp.data['url']?.toString();
+        reason = urlResp.data['reason']?.toString();
       }
       if (url == null || url.isEmpty) {
         final location = urlResp.headers.value('location');
         if (location != null && location.isNotEmpty) url = location;
       }
-      if (url == null || url.isEmpty) return null;
+      if (url == null || url.isEmpty) return SongUrl(url: '', reason: reason);
 
       String? lrc;
       if (lrcResp.data is Map) {

@@ -44,6 +44,7 @@ class SongUrl {
   final String? lrc;
   final String? ext;
   final String source; // 最终由哪条线路提供
+  final String? reason; // need_cookie 等后端状态标识
 
-  SongUrl({required this.url, this.lrc, this.ext, this.source = 'dedicated'});
+  SongUrl({required this.url, this.lrc, this.ext, this.source = 'dedicated', this.reason});
 }
