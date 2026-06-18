@@ -35,7 +35,7 @@ class NeteaseDirectProvider implements MusicProvider {
 
       final resp = await _dio.post(
         '$_baseUrl/eapi$urlPath',
-        data: {'params': params},
+        data: 'params=${Uri.encodeComponent(params)}',
         options: Options(
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
