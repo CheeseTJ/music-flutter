@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'models/song.dart';
-import 'providers/netease_90svip_provider.dart';
+import 'providers/netease_qijieya_provider.dart';
 
 class MusicManager {
   final Dio _dio = Dio(BaseOptions(
@@ -9,21 +9,22 @@ class MusicManager {
     receiveTimeout: const Duration(seconds: 15),
   ));
 
-  late final Netease90svipProvider _netease;
+  late final NeteaseQijieyaProvider _netease;
 
   MusicManager() {
-    _netease = Netease90svipProvider(_dio);
+    _netease = NeteaseQijieyaProvider(_dio);
   }
 
-  /// 搜索（走 90svip API）
+  /// 搜索
   Future<List<Song>> search(String platform, String keyword, {int num = 20}) async {
     if (platform != 'netease') return [];
-    return await _netease.search(keyword);
+    final results = await _netease.search(keyword, limit: num);
+    return results;
   }
 
-  /// 获取播放链接（走 90svip 302 重定向）
+  /// 播放链接
   Future<SongUrl?> getUrl(Song song, {String quality = 'sq'}) async {
-    return await _netease.getUrl(song);
+    return await _netease.getUrl(song.id);
   }
 }
 

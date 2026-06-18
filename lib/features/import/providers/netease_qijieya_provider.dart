@@ -1,0 +1,73 @@
+import 'package:dio/dio.dart';
+import '../models/song.dart';
+
+/// qijieya Meting API — 网易云音乐搜索+播放
+/// 无需鉴权，URL 端点返回 302 真实直链
+class NeteaseQijieyaProvider {
+  final Dio _dio;
+
+  static const _base = 'https://api.qijieya.cn/meting/';
+
+  NeteaseQijieyaProvider(this._dio);
+
+  /// 搜索
+  Future<List<Song>> search(String keyword, {int page = 1, int limit = 30}) async {
+    try {
+      final resp = await _dio.get(_base, queryParameters: {
+        'type': 'search',
+        'id': keyword,
+        'limit': limit,
+        'page': page,
+      });
+
+      final list = resp.data as List? ?? [];
+      return list.map((item) {
+        return Song(
+          platform: 'netease',
+          source: 'qijieya',
+          id: _extractId(item['url']),
+          name: item['name']?.toString() ?? '',
+          singer: item['artist']?.toString() ?? '',
+          album: '',
+          cover: item['pic']?.toString(),
+        );
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// 获取播放链接 — Dio 不跟随 302，取 Location 头
+  Future<SongUrl?> getUrl(String songId, {int br = 320}) async {
+    try {
+      final resp = await _dio.get(_base, queryParameters: {
+        'server': 'netease',
+        'type': 'url',
+        'id': songId,
+        'br': br,
+      }, options: Options(
+        followRedirects: false,
+      ));
+
+      // 302 Location 头即真实 mp3 地址
+      final location = resp.headers.value('location');
+      if (location != null && location.isNotEmpty) {
+        final ext = location.contains('.flac') ? 'flac'
+            : location.contains('.m4a') ? 'm4a'
+                : 'mp3';
+        return SongUrl(url: location, source: 'qijieya', ext: ext);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从 url 字段提取 songId
+  /// 格式: "/?server=netease&type=url&id=5257138" → "5257138"
+  String _extractId(dynamic url) {
+    final s = url?.toString() ?? '';
+    final match = RegExp(r'id=(\d+)').firstMatch(s);
+    return match?.group(1) ?? '';
+  }
+}
