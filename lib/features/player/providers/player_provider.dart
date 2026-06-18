@@ -39,6 +39,9 @@ class PlayerController extends StateNotifier<PlayerState> {
   int _currentIndex = -1;
   int _playMode = 0;
 
+  String? _playingUrlId;
+  String? get playingUrlId => _playingUrlId;
+
   LrcParser? _lyric;
   int _currentLyricIndex = -1;
   int _lyricVersion = 0;
@@ -92,6 +95,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     _currentSong = song;
     _lyric = null;
     _currentLyricIndex = -1;
+    _playingUrlId = null;
     state = PlayerState.loading();
 
     try {
@@ -241,12 +245,13 @@ class PlayerController extends StateNotifier<PlayerState> {
     }
   }
 
-  Future<void> playUrl(String url, String title, String artist) async {
+  Future<void> playUrl(String url, String title, String artist, {String? platform, String? id, String? lyric}) async {
     try {
       state = PlayerState.loading();
-      _currentSong = null;
-      _lyric = null;
+      _currentSong = Song(id: 0, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
+      _lyric = (lyric != null && lyric.isNotEmpty) ? LrcParser.parse(lyric) : null;
       _currentLyricIndex = -1;
+      _playingUrlId = (platform != null && id != null) ? '$platform|$id' : null;
 
       await _handler.loadSong(
         url: url,

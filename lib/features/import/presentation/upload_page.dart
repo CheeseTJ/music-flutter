@@ -254,9 +254,12 @@ class _ImportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+        child: Container(
         width: double.infinity,
         height: 160,
         decoration: BoxDecoration(
@@ -307,7 +310,7 @@ class _ImportCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 

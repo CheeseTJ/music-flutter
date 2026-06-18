@@ -9,6 +9,10 @@ import { deleteSongRoute } from "./routes/delete_song";
 import { updateSongRoute } from "./routes/update_song";
 import { searchRoute } from "./routes/search";
 import { importRoute } from "./routes/import_song";
+import {
+  searchWy, searchQq, searchMg, searchKg, searchKw,
+  importWy, importQq, importMg, importKg, importKw,
+} from "./routes/source_search";
 
 export interface Env {
   MUSIC_BUCKET: R2Bucket;
@@ -43,6 +47,19 @@ app.get("/play", playRoute);
 app.post("/upload", uploadRoute);
 app.get("/search", searchRoute);
 app.post("/import", importRoute);
+
+app.get("/search/wy", searchWy);
+app.get("/search/qq", searchQq);
+app.get("/search/mg", searchMg);
+app.get("/search/kg", searchKg);
+app.get("/search/kw", searchKw);
+
+app.post("/import/wy", importWy);
+app.post("/import/qq", importQq);
+app.post("/import/mg", importMg);
+app.post("/import/kg", importKg);
+app.post("/import/kw", importKw);
+
 app.put("/song", updateSongRoute);
 app.post("/lyric/upload", lyricUploadRoute);
 app.get("/lyric", lyricGetRoute);

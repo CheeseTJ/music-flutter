@@ -1,95 +1,68 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/pearl_colors.dart';
-import '../../../core/theme/pearl_theme.dart';
-import '../../player/providers/player_provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:music_app/core/theme/pearl_colors.dart';
+import 'package:music_app/core/theme/pearl_theme.dart';
+import 'package:music_app/features/player/providers/player_provider.dart';
+import 'package:music_app/features/import/models/song.dart';
+import 'package:music_app/features/import/music_manager.dart';
+import 'package:music_app/data/datasources/remote/api_client.dart';
+import 'package:music_app/core/network/itunes_cover_service.dart';
+import 'package:music_app/shared/widgets/mini_player.dart';
 
 enum _SearchSource {
-  itunes,
-  migu,
   netease,
-  qq;
+  qq,
+  kuwo,
+  kugou;
 
   String get label {
     switch (this) {
-      case _SearchSource.itunes:
-        return 'iTunes';
-      case _SearchSource.migu:
-        return '咪咕';
       case _SearchSource.netease:
-        return '网易云';
+        return '\u7f51\u6613\u4e91';
       case _SearchSource.qq:
         return 'QQ';
+      case _SearchSource.kuwo: return '\u9177\u6211';
+      case _SearchSource.kugou: return '\u9177\u72d7';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case _SearchSource.itunes:
-        return Icons.apple_rounded;
-      case _SearchSource.migu:
-        return Icons.music_note_rounded;
-      case _SearchSource.netease:
-        return Icons.cloud_rounded;
-      case _SearchSource.qq:
-        return Icons.chat_bubble_outline_rounded;
+      case _SearchSource.netease: return Icons.cloud_rounded;
+      case _SearchSource.qq: return Icons.chat_bubble_outline_rounded;
+      case _SearchSource.kuwo: return Icons.headphones_rounded;
+      case _SearchSource.kugou: return Icons.surround_sound_rounded;
     }
   }
 
   Color color(bool isDark) {
     switch (this) {
-      case _SearchSource.itunes:
-        return const Color(0xFFFC3C44);
-      case _SearchSource.migu:
-        return const Color(0xFF00B4FF);
-      case _SearchSource.netease:
-        return const Color(0xFFEC4141);
-      case _SearchSource.qq:
-        return const Color(0xFF31C27C);
+      case _SearchSource.netease: return const Color(0xFFEC4141);
+      case _SearchSource.qq: return const Color(0xFF31C27C);
+      case _SearchSource.kuwo: return const Color(0xFFFFCC00);
+      case _SearchSource.kugou: return const Color(0xFF2D8CF0);
     }
   }
-}
 
-class _SearchResult {
-  final String trackName;
-  final String artistName;
-  final String collectionName;
-  final int durationMs;
-  final String artworkUrl;
-  final String? previewUrl;
-  final _SearchSource source;
-  Uint8List? artwork;
-
-  _SearchResult({
-    required this.trackName,
-    required this.artistName,
-    required this.collectionName,
-    required this.durationMs,
-    required this.artworkUrl,
-    required this.source,
-    this.previewUrl,
-  });
-
-  String get durationFormatted {
-    final totalSec = durationMs ~/ 1000;
-    final m = totalSec ~/ 60;
-    final s = (totalSec % 60).toString().padLeft(2, '0');
-    return '$m:$s';
+  String get platformKey {
+    switch (this) {
+      case _SearchSource.netease: return 'netease';
+      case _SearchSource.qq: return 'qq';
+      case _SearchSource.kuwo: return 'kuwo';
+      case _SearchSource.kugou: return 'kugou';
+    }
   }
 
-  factory _SearchResult.fromJson(Map<String, dynamic> json, _SearchSource source) {
-    return _SearchResult(
-      trackName: json['trackName'] as String? ?? '',
-      artistName: json['artistName'] as String? ?? '',
-      collectionName: json['collectionName'] as String? ?? '',
-      durationMs: json['trackTimeMillis'] as int? ?? 0,
-      artworkUrl: (json['artworkUrl100'] as String? ?? '').replaceAll('100x100bb', '600x600bb'),
-      previewUrl: json['previewUrl'] as String?,
-      source: source,
-    );
+  Widget platformIcon(double size) {
+    final asset = switch (this) {
+      _SearchSource.netease => 'assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg',
+      _SearchSource.qq => 'assets/icons/QQ\u97f3\u4e50.svg',
+      _SearchSource.kuwo => 'assets/icons/kuwo.svg',
+      _SearchSource.kugou => 'assets/icons/\u9177\u72d7.svg',
+    };
+    return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
   }
 }
 
@@ -103,17 +76,44 @@ class InternetSearchPage extends ConsumerStatefulWidget {
 class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   final _searchCtrl = TextEditingController();
   final _focusNode = FocusNode();
-  List<_SearchResult> _results = [];
+  List<Song> _results = [];
   bool _loading = false;
   String _error = '';
-  _SearchSource _activeSource = _SearchSource.itunes;
-
-  static final Map<int, Uint8List> _artCache = {};
+  _SearchSource _activeSource = _SearchSource.netease;
+  bool _importingSong = false;
+  final _coverService = const ITunesCoverService();
+  final Map<String, String?> _coverCache = {};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    _loadSavedSource();
+  }
+
+  Future<void> _loadSavedSource() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('search_source');
+    if (saved != null) {
+      final src = _SearchSource.values.where((s) => s.platformKey == saved).firstOrNull;
+      if (src != null && mounted) setState(() => _activeSource = src);
+    }
+  }
+
+  Future<String?> _loadCover(String title, String artist) {
+    final key = '${title}_$artist';
+    if (_coverCache.containsKey(key)) return Future.value(_coverCache[key]);
+    return _coverService.fetchUrl(title, artist).then((url) {
+      _coverCache[key] = url;
+      return url;
+    });
+  }
+
+  Future<void> _onSourceChanged(_SearchSource src) async {
+    setState(() => _activeSource = src);
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('search_source', src.platformKey);
+    _doSearch(_searchCtrl.text);
   }
 
   @override
@@ -139,7 +139,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     });
 
     try {
-      final results = await _searchSource(query);
+      final mgr = ref.read(musicManagerProvider);
+      final platform = _activeSource.platformKey;
+      final results = await mgr.search(platform, query);
+
       if (mounted) {
         setState(() {
           _results = results;
@@ -156,137 +159,153 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     }
   }
 
-  Future<List<_SearchResult>> _searchSource(String term) async {
-    switch (_activeSource) {
-      case _SearchSource.itunes:
-        return _searchITunes(term);
-      case _SearchSource.migu:
-      case _SearchSource.netease:
-      case _SearchSource.qq:
-        throw Exception('${_activeSource.label}搜索暂未接入');
-    }
-  }
-
-  Future<List<_SearchResult>> _searchITunes(String term) async {
-    final encoded = Uri.encodeComponent(term);
-    final url = 'https://itunes.apple.com/search?term=$encoded&limit=30&country=cn&media=music';
-
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
-    try {
-      final req = await client.getUrl(Uri.parse(url));
-      req.headers.set('User-Agent', 'MusicApp/1.0');
-      final resp = await req.close().timeout(const Duration(seconds: 10));
-      if (resp.statusCode != 200) {
-        throw Exception('搜索服务异常 (${resp.statusCode})');
-      }
-
-      final body = await resp.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      final list = data['results'] as List? ?? [];
-
-      return list
-          .map((e) => _SearchResult.fromJson(e as Map<String, dynamic>, _SearchSource.itunes))
-          .where((r) => r.trackName.isNotEmpty)
-          .toList();
-    } finally {
-      client.close();
-    }
-  }
-
-  Future<void> _fetchArtwork(_SearchResult result) async {
-    if (result.artworkUrl.isEmpty) return;
-    final key = result.artworkUrl.hashCode;
-    if (_artCache.containsKey(key)) {
-      result.artwork = _artCache[key];
+  Future<void> _doPlay(Song song) async {
+    final playingUrlId = ref.read(playerProvider.notifier).playingUrlId;
+    final songId = '${song.platform}|${song.id}';
+    if (songId == playingUrlId) {
+      ref.read(playerProvider.notifier).togglePlayPause();
       return;
     }
 
     try {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-      try {
-        final req = await client.getUrl(Uri.parse(result.artworkUrl));
-        final resp = await req.close().timeout(const Duration(seconds: 6));
-        if (resp.statusCode != 200) return;
-
-        final sink = BytesBuilder(copy: false);
-        await for (final chunk in resp) {
-          sink.add(chunk);
-          if (sink.length > 262144) break;
+      final mgr = ref.read(musicManagerProvider);
+      final url = await mgr.getUrl(song);
+      if (url == null || url.url.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('\u83b7\u53d6\u64ad\u653e\u94fe\u63a5\u5931\u8d25'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
         }
-        final bytes = sink.takeBytes();
-        _artCache[key] = bytes;
-        result.artwork = bytes;
-      } finally {
-        client.close();
+        return;
       }
-    } catch (_) {}
+      final notifier = ref.read(playerProvider.notifier);
+      await notifier.playUrl(url.url, song.name, song.singer,
+          platform: song.platform, id: song.id, lyric: url.lrc);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('\u64ad\u653e\u5931\u8d25: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _doImport(Song song) async {
+    if (_importingSong) return;
+    setState(() => _importingSong = true);
+    try {
+      final mgr = ref.read(musicManagerProvider);
+      final url = await mgr.getUrl(song);
+      if (url == null || url.url.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: const Text('\u83b7\u53d6\u4e0b\u8f7d\u94fe\u63a5\u5931\u8d25'), backgroundColor: Colors.redAccent),
+          );
+        }
+        return;
+      }
+      final api = ref.read(apiClientProvider);
+      await api.downloadFromUrl(url.url, song.name, song.singer);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${song.name} \u5df2\u6dfb\u52a0\u5230\u66f2\u5e93'), backgroundColor: const Color(0xFF2E7D32)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('\u5bfc\u5165\u5931\u8d25: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingSong = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomPadding = MediaQuery.of(context).padding.bottom + 24;
+    final playingUrlId = ref.watch(playerProvider.notifier).playingUrlId;
+    final playerPhase = ref.watch(playerProvider.select((v) => v.phase));
+    final hasSong = playingUrlId != null && playerPhase != PlayerPhase.idle && playerPhase != PlayerPhase.error;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = bottomInset + 24 + (hasSong ? 80 : 0);
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: PearlColors.bgPrimary(isDark),
       body: SafeArea(
         bottom: false,
-        child: Column(
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20,
-                        color: PearlColors.textPrimary(isDark)),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  Expanded(
-                    child: SizedBox(
-                      height: 44,
-                      child: TextField(
-                        controller: _searchCtrl,
-                        focusNode: _focusNode,
-                        onChanged: (v) => _doSearch(v),
-                        decoration: InputDecoration(
-                          hintText: '搜索歌曲或歌手...',
-                          prefixIcon: Icon(Icons.search_rounded, size: 20,
-                              color: PearlColors.textDisabled(isDark)),
-                          filled: true,
-                          fillColor: PearlColors.glassBg(isDark),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(PearlTheme.radiusMd),
-                            borderSide: BorderSide.none,
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 16, 12),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20,
+                            color: PearlColors.textPrimary(isDark)),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      Expanded(
+                        child: SizedBox(
+                          height: 44,
+                          child: TextField(
+                            controller: _searchCtrl,
+                            focusNode: _focusNode,
+                            onChanged: (v) => _doSearch(v),
+                            decoration: InputDecoration(
+                              hintText: '\u641c\u7d22\u6b4c\u66f2\u6216\u6b4c\u624b...',
+                              prefixIcon: Icon(Icons.search_rounded, size: 20,
+                                  color: PearlColors.textDisabled(isDark)),
+                              filled: true,
+                              fillColor: PearlColors.glassBg(isDark),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(PearlTheme.radiusMd),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            style: TextStyle(fontSize: 14, color: PearlColors.textPrimary(isDark)),
                           ),
                         ),
-                        style: TextStyle(fontSize: 14, color: PearlColors.textPrimary(isDark)),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      _PlatformDropdown(
+                        activeSource: _activeSource,
+                        isDark: isDark,
+                        onChanged: _onSourceChanged,
+                      ),
+                    ],
                   ),
-                ],
+                ),
+                Expanded(
+                  child: _buildBody(isDark, bottomPadding, playingUrlId ?? '', playerPhase),
+                ),
+              ],
+            ),
+            if (hasSong)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: bottomInset + 12,
+                child: const MiniPlayer(),
               ),
-            ),
-            _SourceBar(
-              activeSource: _activeSource,
-              isDark: isDark,
-              onChanged: (src) {
-                setState(() => _activeSource = src);
-                _doSearch(_searchCtrl.text);
-              },
-            ),
-            Expanded(
-              child: _buildBody(isDark, bottomPadding),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBody(bool isDark, double bottomPadding) {
+  Widget _buildBody(bool isDark, double bottomPadding, String playingUrlId, PlayerPhase playerPhase) {
     if (_loading) {
       return Center(
         child: SizedBox(
@@ -327,10 +346,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
               Icon(Icons.music_note_rounded, size: 56,
                   color: PearlColors.textDisabled(isDark)),
               const SizedBox(height: 16),
-              Text('搜索你喜欢的音乐',
+              Text('\u641c\u7d22\u4f60\u559c\u6b22\u7684\u97f3\u4e50',
                   style: TextStyle(fontSize: 16, color: PearlColors.textSecondary(isDark))),
               const SizedBox(height: 4),
-              Text('切换线路搜索不同平台的歌曲',
+              Text('\u5207\u6362\u7ebf\u8def\u641c\u7d22\u4e0d\u540c\u5e73\u53f0\u7684\u6b4c\u66f2',
                   style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
             ],
           ),
@@ -346,10 +365,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
             Icon(Icons.search_off_rounded, size: 48,
                 color: PearlColors.textDisabled(isDark)),
             const SizedBox(height: 12),
-            Text('没有找到相关歌曲',
+            Text('\u6ca1\u6709\u627e\u5230\u76f8\u5173\u6b4c\u66f2',
                 style: TextStyle(fontSize: 15, color: PearlColors.textSecondary(isDark))),
             const SizedBox(height: 4),
-            Text('换个关键词或线路试试',
+            Text('\u6362\u4e2a\u5173\u952e\u8bcd\u6216\u7ebf\u8def\u8bd5\u8bd5',
                 style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
           ],
         ),
@@ -360,29 +379,40 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       padding: EdgeInsets.only(top: 8, bottom: bottomPadding),
       itemCount: _results.length,
       itemBuilder: (_, i) {
-        final result = _results[i];
-        _fetchArtwork(result);
+        final song = _results[i];
+        final songId = '${song.platform}|${song.id}';
         return _ResultTile(
-          result: result,
+          song: song,
           isDark: isDark,
-          onTap: () {
-            final notifier = ref.read(playerProvider.notifier);
-            if (result.previewUrl != null) {
-              notifier.playUrl(result.previewUrl!, result.trackName, result.artistName);
-            }
-          },
+          onTap: () => _doPlay(song),
+          onImport: () => _doImport(song),
+          isPlaying: songId == playingUrlId,
+          playerPhase: playerPhase,
+          coverFuture: song.cover != null && song.cover!.isNotEmpty
+              ? Future.value(song.cover)
+              : _loadCover(song.name, song.singer),
         );
       },
     );
   }
 }
 
-class _SourceBar extends StatelessWidget {
+Widget _placeholderIcon(Color badgeColor, IconData icon) {
+  return Container(
+    decoration: BoxDecoration(
+      color: badgeColor.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Icon(icon, size: 22, color: badgeColor),
+  );
+}
+
+class _PlatformDropdown extends StatelessWidget {
   final _SearchSource activeSource;
   final bool isDark;
   final ValueChanged<_SearchSource> onChanged;
 
-  const _SourceBar({
+  const _PlatformDropdown({
     required this.activeSource,
     required this.isDark,
     required this.onChanged,
@@ -390,64 +420,75 @@ class _SourceBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _SearchSource.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final source = _SearchSource.values[i];
-          final active = source == activeSource;
-          final color = source.color(isDark);
-
-          return GestureDetector(
-            onTap: () => onChanged(source),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: active ? color.withValues(alpha: 0.15) : PearlColors.glassBg(isDark),
-                borderRadius: BorderRadius.circular(20),
-                border: active ? Border.all(color: color.withValues(alpha: 0.4), width: 1) : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(source.icon, size: 14, color: active ? color : PearlColors.textDisabled(isDark)),
-                  const SizedBox(width: 6),
-                  Text(
-                    source.label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: active ? color : PearlColors.textSecondary(isDark),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    return GestureDetector(
+      onTapDown: (d) => _showMenu(context, d.globalPosition),
+      child: activeSource.platformIcon(30),
     );
+  }
+
+  void _showMenu(BuildContext context, Offset position) {
+    final items = _SearchSource.values.map((src) {
+      final active = src == activeSource;
+      return PopupMenuItem<_SearchSource>(
+        value: src,
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            src.platformIcon(22),
+            const SizedBox(width: 8),
+            Text(src.label, style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600,
+              color: active ? src.color(isDark) : PearlColors.textPrimary(isDark),
+            )),
+          ],
+        ),
+      );
+    }).toList();
+
+    showMenu<_SearchSource>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy + 4, position.dx, position.dy),
+      elevation: 4,
+      color: PearlColors.bgSecondary(isDark),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      items: items,
+    ).then((value) {
+      if (value != null) onChanged(value);
+    });
   }
 }
 
 class _ResultTile extends StatelessWidget {
-  final _SearchResult result;
+  final Song song;
   final bool isDark;
   final VoidCallback onTap;
+  final VoidCallback onImport;
+  final bool isPlaying;
+  final PlayerPhase playerPhase;
+  final Future<String?> coverFuture;
 
   const _ResultTile({
-    required this.result,
+    required this.song,
     required this.isDark,
     required this.onTap,
+    required this.onImport,
+    required this.playerPhase,
+    required this.coverFuture,
+    this.isPlaying = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final sourceColor = result.source.color(isDark);
+    final platformEnum = _SearchSource.values.firstWhere(
+      (s) => s.platformKey == song.platform,
+      orElse: () => _SearchSource.netease,
+    );
+    final platformColor = platformEnum.color(isDark);
+    final isMeting = song.source == 'meting';
+    final badgeColor = isMeting ? PearlColors.textSecondary(isDark) : platformColor;
+    final accentColor = PearlColors.accent(isDark);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -464,19 +505,27 @@ class _ResultTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: result.artwork != null
-                          ? Image.memory(result.artwork!, width: 48, height: 48, fit: BoxFit.cover)
-                          : Container(
-                              width: 48, height: 48,
-                              decoration: BoxDecoration(
-                                color: PearlColors.glassBg(isDark),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(Icons.music_note_rounded, size: 22,
-                                  color: PearlColors.textDisabled(isDark)),
-                            ),
+                    FutureBuilder<String?>(
+                      future: coverFuture,
+                      builder: (_, snap) {
+                        final hasCover = snap.hasData && snap.data != null;
+                        return Container(
+                          width: 48, height: 48,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: hasCover
+                              ? Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.network(snap.data!, fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => _placeholderIcon(badgeColor, platformEnum.icon)),
+                                  ],
+                                )
+                              : _placeholderIcon(badgeColor, platformEnum.icon),
+                        );
+                      },
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -488,7 +537,7 @@ class _ResultTile extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  result.trackName,
+                                  song.name,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -498,23 +547,11 @@ class _ResultTile extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: sourceColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  result.source.label,
-                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: sourceColor),
-                                ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${result.artistName}${result.collectionName.isNotEmpty ? " · ${result.collectionName}" : ""}',
+                            '${song.singer}${song.album != null && song.album!.isNotEmpty ? " \u8def ${song.album}" : ""}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -525,12 +562,48 @@ class _ResultTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Text(
-                      result.durationFormatted,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: PearlColors.textDisabled(isDark),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onTap,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: accentColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                  isPlaying && playerPhase == PlayerPhase.playing
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  size: 18, color: accentColor,
+                                ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: onImport,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF44D3FF).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF44D3FF)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -549,3 +622,4 @@ class _ResultTile extends StatelessWidget {
     );
   }
 }
+

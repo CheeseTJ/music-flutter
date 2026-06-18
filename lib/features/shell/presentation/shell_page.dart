@@ -29,6 +29,7 @@ class ShellPage extends ConsumerWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: PearlColors.bgPrimary(isDark),
         extendBody: true,
         body: Stack(

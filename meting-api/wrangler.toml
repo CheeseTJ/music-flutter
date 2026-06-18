@@ -1,0 +1,10 @@
+name = "meting-api"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# 可选：网易云 Cookie 用于 VIP 歌曲
+NETEASE_COOKIE = ""
+
+# 可选：QQ 音乐 Cookie 用于高音质
+TENCENT_COOKIE = ""

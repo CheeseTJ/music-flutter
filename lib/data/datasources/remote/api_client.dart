@@ -133,7 +133,34 @@ class ApiClient {
         detail += ' | Status: ${e.response!.statusCode}';
         detail += ' | Body: ${e.response!.data}';
       }
-      throw Exception('删除封图失败: $detail');
+      throw Exception('\u5220\u9664\u5c01\u56fe\u5931\u8d25: $detail');
+    }
+  }
+
+  Future<void> downloadFromUrl(String url, String title, String artist, {String? coverUrl}) async {
+    final headers = _signer.generateSignature('POST', '/download_url');
+    try {
+      final response = await _dio.post(
+        '/download_url',
+        data: {
+          'url': url,
+          'title': title,
+          'artist': artist,
+          if (coverUrl != null) 'cover_url': coverUrl,
+        },
+        options: Options(headers: headers),
+      );
+      final data = response.data as Map<String, dynamic>;
+      if (data['success'] != true) {
+        throw Exception(data['error'] as String? ?? '\u4e0b\u8f7d\u5931\u8d25');
+      }
+    } on DioException catch (e) {
+      String detail = e.message ?? '';
+      if (e.response != null) {
+        detail += ' | Status: ${e.response!.statusCode}';
+        detail += ' | Body: ${e.response!.data}';
+      }
+      throw Exception('\u4e0b\u8f7d\u5931\u8d25: $detail');
     }
   }
 
@@ -157,6 +184,38 @@ class ApiClient {
         detail += ' | Body: ${e.response!.data}';
       }
       throw Exception('封图上传失败: $detail');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchSongs(String name, String type) async {
+    final response = await _dio.get(
+      '/search/$type',
+      queryParameters: {'name': name},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return List<Map<String, dynamic>>.from(data['results'] ?? []);
+  }
+
+  Future<Map<String, dynamic>> importSong(String type, int songId) async {
+    final headers = _signer.generateSignature('POST', '/import/$type');
+    try {
+      final response = await _dio.post(
+        '/import/$type',
+        data: {'id': songId},
+        options: Options(headers: headers),
+      );
+      final data = response.data as Map<String, dynamic>;
+      if (data['success'] != true) {
+        throw Exception(data['error'] as String? ?? '导入失败');
+      }
+      return data;
+    } on DioException catch (e) {
+      String detail = e.message ?? '';
+      if (e.response != null) {
+        detail += ' | Status: ${e.response!.statusCode}';
+        detail += ' | Body: ${e.response!.data}';
+      }
+      throw Exception('导入失败: $detail');
     }
   }
 }
