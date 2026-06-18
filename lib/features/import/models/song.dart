@@ -7,6 +7,7 @@ class Song {
   final String? album;
   final String? cover;
   final String? quality;
+  final Map<String, dynamic>? extra; // 透传额外数据（签名等）
 
   Song({
     required this.platform,
@@ -17,6 +18,7 @@ class Song {
     this.album,
     this.cover,
     this.quality,
+    this.extra,
   });
 
   Song copyWith({String? source}) => Song(

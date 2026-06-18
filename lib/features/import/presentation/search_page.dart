@@ -12,41 +12,35 @@ import 'package:music_app/core/network/itunes_cover_service.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
 
 enum _SearchSource {
-  netease,
-  kuwo;
+  netease;
 
   String get label {
     switch (this) {
       case _SearchSource.netease: return '\u7f51\u6613\u4e91';
-      case _SearchSource.kuwo:   return '\u9177\u6211';
     }
   }
 
   IconData get icon {
     switch (this) {
       case _SearchSource.netease: return Icons.cloud_rounded;
-      case _SearchSource.kuwo:   return Icons.headphones_rounded;
     }
   }
 
   Color color(bool isDark) {
     switch (this) {
       case _SearchSource.netease: return const Color(0xFFEC4141);
-      case _SearchSource.kuwo:   return const Color(0xFFFFCC00);
     }
   }
 
   String get platformKey {
     switch (this) {
       case _SearchSource.netease: return 'netease';
-      case _SearchSource.kuwo:   return 'kuwo';
     }
   }
 
   Widget platformIcon(double size) {
     final asset = switch (this) {
       _SearchSource.netease => 'assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg',
-      _SearchSource.kuwo   => 'assets/icons/kuwo.svg',
     };
     return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
   }
