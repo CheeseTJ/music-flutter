@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'models/song.dart';
-import 'providers/music_provider.dart';
 import 'providers/meting_provider.dart';
+import 'providers/kuwo_direct_provider.dart';
+import 'providers/netease_direct_provider.dart';
 
 class MusicManager {
   final Dio _dio = Dio(BaseOptions(
@@ -14,27 +15,28 @@ class MusicManager {
     },
   ));
 
-  late final MusicProvider _mNetease, _mKuwo, _mKugou;
+  late final MetingProvider     _mNetease, _mKuwo;
+  late final KuwoDirectProvider    _kuwoUrl;
+  late final NeteaseDirectProvider _neteaseUrl;
 
   MusicManager() {
-    _mNetease = MetingProvider(_dio, server: 'netease');
-    _mKuwo    = MetingProvider(_dio, server: 'kuwo');
-    _mKugou   = MetingProvider(_dio, server: 'kugou');
+    _mNetease   = MetingProvider(_dio, server: 'netease');
+    _mKuwo      = MetingProvider(_dio, server: 'kuwo');
+    _kuwoUrl    = KuwoDirectProvider(_dio);
+    _neteaseUrl = NeteaseDirectProvider(_dio);
   }
 
-  /// 搜索
+  /// 搜索（走 Worker）
   Future<List<Song>> search(String platform, String keyword, {int num = 20}) async {
     final p = switch (platform) {
       'netease' => _mNetease,
-      'kuwo' => _mKuwo,
-      'kugou' => _mKugou,
-      _ => null,
+      'kuwo'    => _mKuwo,
+      _         => null,
     };
     if (p == null) return [];
 
     try {
       final results = await p.search(keyword, num: num);
-      // 归一化 platform 名称
       return results.map((s) => Song(
         platform: platform,
         source: 'meting',
@@ -50,18 +52,17 @@ class MusicManager {
     }
   }
 
-  /// 取播放链接
+  /// 取播放链接（App 直连，不经过 Worker）
   Future<SongUrl?> getUrl(Song song, {String quality = 'sq'}) async {
-    final p = switch (song.platform) {
-      'netease' => _mNetease,
-      'kuwo' => _mKuwo,
-      'kugou' => _mKugou,
-      _ => null,
-    };
-    if (p == null) return null;
-
     try {
-      return await p.getUrl(song, quality: quality);
+      switch (song.platform) {
+        case 'netease':
+          return await _neteaseUrl.getUrl(song, quality: quality);
+        case 'kuwo':
+          return await _kuwoUrl.getUrl(song, quality: quality);
+        default:
+          return null;
+      }
     } catch (_) {
       return null;
     }

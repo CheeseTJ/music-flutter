@@ -13,14 +13,12 @@ import 'package:music_app/shared/widgets/mini_player.dart';
 
 enum _SearchSource {
   netease,
-  kuwo,
-  kugou;
+  kuwo;
 
   String get label {
     switch (this) {
       case _SearchSource.netease: return '\u7f51\u6613\u4e91';
       case _SearchSource.kuwo:   return '\u9177\u6211';
-      case _SearchSource.kugou:  return '\u9177\u72d7';
     }
   }
 
@@ -28,7 +26,6 @@ enum _SearchSource {
     switch (this) {
       case _SearchSource.netease: return Icons.cloud_rounded;
       case _SearchSource.kuwo:   return Icons.headphones_rounded;
-      case _SearchSource.kugou:  return Icons.surround_sound_rounded;
     }
   }
 
@@ -36,7 +33,6 @@ enum _SearchSource {
     switch (this) {
       case _SearchSource.netease: return const Color(0xFFEC4141);
       case _SearchSource.kuwo:   return const Color(0xFFFFCC00);
-      case _SearchSource.kugou:  return const Color(0xFF2D8CF0);
     }
   }
 
@@ -44,7 +40,6 @@ enum _SearchSource {
     switch (this) {
       case _SearchSource.netease: return 'netease';
       case _SearchSource.kuwo:   return 'kuwo';
-      case _SearchSource.kugou:  return 'kugou';
     }
   }
 
@@ -52,7 +47,6 @@ enum _SearchSource {
     final asset = switch (this) {
       _SearchSource.netease => 'assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg',
       _SearchSource.kuwo   => 'assets/icons/kuwo.svg',
-      _SearchSource.kugou  => 'assets/icons/\u9177\u72d7.svg',
     };
     return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
   }
@@ -165,10 +159,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       if (url == null || url.url.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('\u83b7\u53d6\u64ad\u653e\u94fe\u63a5\u5931\u8d25'),
-              backgroundColor: Colors.redAccent,
-            ),
+            SnackBar(content: const Text('\u83b7\u53d6\u64ad\u653e\u94fe\u63a5\u5931\u8d25'), backgroundColor: Colors.redAccent),
           );
         }
         return;
