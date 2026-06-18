@@ -142,7 +142,6 @@ final audioHandlerProvider = StateProvider<MusicAudioHandler>((ref) {
 Future<void> initAudioService(StateController<MusicAudioHandler> controller) async {
   await Future.delayed(const Duration(milliseconds: 800));
   try {
-    debugPrint('[AudioService] init starting...');
     final handler = await AudioService.init(
       builder: () => MusicAudioHandler(),
       config: AudioServiceConfig(
@@ -152,9 +151,6 @@ Future<void> initAudioService(StateController<MusicAudioHandler> controller) asy
         androidStopForegroundOnPause: true,
       ),
     ).timeout(const Duration(seconds: 10));
-    debugPrint('[AudioService] init SUCCESS');
     controller.state = handler;
-  } catch (e) {
-    debugPrint('[AudioService] init FAILED: $e');
-  }
+  } catch (_) {}
 }
