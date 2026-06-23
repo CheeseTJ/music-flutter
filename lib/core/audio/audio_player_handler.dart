@@ -146,7 +146,23 @@ Future<void> initAudioService(StateController<MusicAudioHandler> controller) asy
       builder: () => MusicAudioHandler(),
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.example.music_app.channel.audio',
-        androidNotificationChannelName: '音乐播放',
+        androidNotificationChannelName: '\u97f3\u4e50\u64ad\u653e',
+        // Status bar / lock-screen small icon. Must be a flat white
+        // silhouette on a transparent background — Android tints it
+        // automatically to match the system theme. Without this the
+        // default launcher icon gets used, which looks like a blob.
+        androidNotificationIcon: 'ic_stat_music_note',
+        // Accent color used for the small icon tint and the
+        // notification's expand-button ring on Android 5–12. Matches
+        // the Pearl accent (cyan-blue) so the media chip feels part
+        // of the app's brand.
+        androidNotificationColor: const Color(0xFF44D3FF),
+        // Click the body of the notification (not the controls) →
+        // open the app to the player page.
+        androidNotificationClickStartsActivity: true,
+        // Foreground service stays running while playing; drop the
+        // foreground notification on pause so the status bar quiets
+        // down when nothing is playing.
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
       ),

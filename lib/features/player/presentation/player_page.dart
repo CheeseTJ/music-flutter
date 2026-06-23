@@ -4,9 +4,11 @@ import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/animation/pearl_motion.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
 import '../../../core/utils/color_extractor.dart';
+import '../../../core/widgets/pearl_bottom_sheet.dart';
 import '../../../data/models/song.dart';
 import '../../../core/network/platform_cover_service.dart';
 import '../../player/providers/player_provider.dart';
@@ -35,15 +37,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     super.initState();
     _bgCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 40),
+      duration: PearlMotion.durationBg,
     );
     _lyricCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: PearlMotion.durationLg,
     );
     _fadeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 220),
+      duration: PearlMotion.durationMd,
     );
     _bgCtrl.repeat();
     _fadeCtrl.forward();
@@ -77,6 +79,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
     if (url != null) {
       _extractColorFromUrl(url, id);
+    } else {
+      // Local song: tint the background animation to match the gradient
+      // cover so the player feels visually coherent.
+      _bgColor = _GradientCover.colorsFor(song.title).first;
     }
   }
 
@@ -164,36 +170,52 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   Widget _buildBackground(bool isDark, Size size) {
-    return AnimatedBuilder(
-      animation: _bgCtrl,
-      builder: (context, child) {
-        final t = _bgCtrl.value * 2 * pi;
-        final hsv = HSVColor.fromColor(_bgColor);
+    // NOTE: `Positioned.fill` MUST be a direct child of the surrounding
+    // Stack. If it lives inside `AnimatedBuilder` / `RepaintBoundary`,
+    // those `RenderProxyBox`es intercept the parent-data lookup and the
+    // Positioned tries (and fails) to apply `StackParentData` to a node
+    // that only accepts the default `ParentData` — which is the
+    // "Incorrect use of ParentDataWidget" error you saw at runtime.
+    // We therefore wrap the WHOLE subtree with Positioned.fill here,
+    // so the Stack child slot gets StackParentData directly.
+    return Positioned.fill(
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _bgCtrl,
+          builder: (context, child) {
+            // Use a ColorTween to smoothly transition between the previous
+            // extracted color and the latest one, avoiding hard cuts when
+            // a new track's cover arrives.
+            final t = _bgCtrl.value * 2 * pi;
+            final hsv = HSVColor.fromColor(_bgColor);
 
-        final c1 = hsv
-            .withHue((hsv.hue + sin(t) * 15).clamp(0, 360))
-            .withSaturation((hsv.saturation + cos(t * 1.3) * 0.12).clamp(0, 1))
-            .withValue((hsv.value + sin(t * 0.7) * 0.08).clamp(0, 1))
-            .toColor();
+            final c1 = hsv
+                .withHue((hsv.hue + sin(t) * 15).clamp(0, 360))
+                .withSaturation((hsv.saturation + cos(t * 1.3) * 0.12).clamp(0, 1))
+                .withValue((hsv.value + sin(t * 0.7) * 0.08).clamp(0, 1))
+                .toColor();
 
-        final c2 = hsv
-            .withHue((hsv.hue + cos(t * 1.7) * 18).clamp(0, 360))
-            .withSaturation((hsv.saturation + sin(t * 0.9) * 0.1).clamp(0, 1))
-            .withValue((hsv.value - 0.1 + cos(t * 1.1) * 0.06).clamp(0, 1))
-            .toColor();
+            final c2 = hsv
+                .withHue((hsv.hue + cos(t * 1.7) * 18).clamp(0, 360))
+                .withSaturation((hsv.saturation + sin(t * 0.9) * 0.1).clamp(0, 1))
+                .withValue((hsv.value - 0.1 + cos(t * 1.1) * 0.06).clamp(0, 1))
+                .toColor();
 
-        return Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [c1.withValues(alpha: 0.15), c2.withValues(alpha: 0.08)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    c1.withValues(alpha: 0.15),
+                    c2.withValues(alpha: 0.08)
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
-            ),
-          ),
-        );
-      },
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -239,25 +261,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
               borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
               child: _coverUrl != null
                   ? Image.network(_coverUrl!, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        decoration: BoxDecoration(
-                          color: PearlColors.glassBg(isDark),
-                          borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-                        ),
-                        child: Center(
-                          child: Icon(Icons.music_note_rounded, size: 80,
-                              color: Colors.white.withValues(alpha: 0.2)),
-                        ),
+                      errorBuilder: (_, __, ___) => _GradientCover(
+                        title: song.title,
+                        radius: PearlTheme.radiusXl,
+                        isDark: isDark,
                       ))
-                  : Container(
-                      decoration: BoxDecoration(
-                        color: PearlColors.glassBg(isDark),
-                        borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-                      ),
-                      child: Center(
-                        child: Icon(Icons.music_note_rounded, size: 80,
-                            color: Colors.white.withValues(alpha: 0.2)),
-                      ),
+                  : _GradientCover(
+                      title: song.title,
+                      radius: PearlTheme.radiusXl,
+                      isDark: isDark,
                     ),
             ),
           ),
@@ -421,10 +433,24 @@ class _PlayerControlsBar extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                size: 36,
-                color: Colors.white,
+              child: Center(
+                // AnimatedSwitcher smoothly cross-fades between play/pause
+                // icons instead of swapping them instantly.
+                child: AnimatedSwitcher(
+                  duration: PearlMotion.durationSm,
+                  switchInCurve: PearlMotion.standard,
+                  switchOutCurve: PearlMotion.standardIn,
+                  transitionBuilder: (child, anim) =>
+                      ScaleTransition(scale: anim, child: child),
+                  child: Icon(
+                    isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    key: ValueKey<bool>(isPlaying),
+                    size: 36,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
           ),
@@ -482,6 +508,21 @@ class _CurrentLyricLine extends ConsumerWidget {
     required this.onTap,
   });
 
+  // The lyrics preview shows up to 5 lines (current ± 2). The previous
+  // implementation used `mainAxisSize: min`, which meant the widget grew
+  // from 1 line ("加载歌词中...") to 5 lines once the lyrics loaded, and
+  // the surrounding `Spacer`s in `_buildMainContent` shifted the artwork
+  // and controls as a result. We reserve a fixed height up-front so the
+  // surrounding layout never moves when the lyrics arrive.
+  //
+  // Height math (5 lines):
+  //   current line  : 18 * 1.5 = 27
+  //   4 context     : 14 * 1.5 = 21 each
+  //   4 paddings    : 10 each between non-first lines
+  //   total         : 27 + 4*21 + 4*10 = 151
+  //   + ~10px slack = 160
+  static const double _kLyricPreviewHeight = 160;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(playerProvider);
@@ -491,67 +532,96 @@ class _CurrentLyricLine extends ConsumerWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: StreamBuilder<Duration>(
-          stream: notifier.player.positionStream,
-          builder: (context, snapshot) {
-            if (state.lyricLoading) {
-              return Center(
-                child: Text('加载歌词中...',
-                    style: TextStyle(fontSize: 14, color: textS)),
-              );
-            }
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        height: _kLyricPreviewHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: StreamBuilder<Duration>(
+            stream: notifier.player.positionStream,
+            builder: (context, snapshot) {
+              // AnimatedSwitcher cross-fades between "loading / no lyrics"
+              // and the 5-line preview so the user sees a soft transition
+              // rather than a sudden appearance.
+              final Widget child;
+              if (state.lyricLoading) {
+                child = Text('加载歌词中...',
+                    key: const ValueKey('lyric-loading'),
+                    style: TextStyle(fontSize: 14, color: textS));
+              } else {
+                final lyric = notifier.lyric;
+                if (lyric == null || lyric.lines.isEmpty) {
+                  child = Text('暂无歌词',
+                      key: const ValueKey('lyric-empty'),
+                      style: TextStyle(fontSize: 14, color: textS));
+                } else {
+                  final position = snapshot.data ?? Duration.zero;
+                  final idx = lyric.findIndex(position);
 
-            final lyric = notifier.lyric;
-            if (lyric == null || lyric.lines.isEmpty) {
-              return Center(
-                child: Text('暂无歌词',
-                    style: TextStyle(fontSize: 14, color: textS)),
-              );
-            }
+                  final lines = <_LyricLineEntry>[];
+                  for (var i = -2; i <= 2; i++) {
+                    final lineIdx = idx + i;
+                    if (lineIdx >= 0 && lineIdx < lyric.lines.length) {
+                      lines.add(_LyricLineEntry(
+                        text: lyric.lines[lineIdx].text,
+                        isCurrent: i == 0,
+                        // Stable identity for AnimatedSwitcher so we can
+                        // animate the highlighted line sliding through the
+                        // preview as the playhead advances.
+                        key: ValueKey<String>('line-$lineIdx'),
+                      ));
+                    }
+                  }
+                  if (lines.isEmpty) {
+                    lines.add(const _LyricLineEntry(text: '...', isCurrent: true));
+                  }
 
-            final position = snapshot.data ?? Duration.zero;
-            final idx = lyric.findIndex(position);
-
-            final lines = <_LyricLineEntry>[];
-            for (var i = -2; i <= 2; i++) {
-              final lineIdx = idx + i;
-              if (lineIdx >= 0 && lineIdx < lyric.lines.length) {
-                lines.add(_LyricLineEntry(
-                  text: lyric.lines[lineIdx].text,
-                  isCurrent: i == 0,
-                ));
+                  child = Column(
+                    key: const ValueKey('lyric-loaded'),
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: List.generate(lines.length, (i) {
+                      final entry = lines[i];
+                      // AnimatedDefaultTextStyle smoothly tweens font size,
+                      // weight and color so the "current" highlight glides
+                      // down a row as the playhead advances, instead of
+                      // snapping from one line to the next.
+                      final baseStyle = TextStyle(
+                        fontSize: entry.isCurrent ? 18 : 14,
+                        fontWeight: entry.isCurrent ? FontWeight.w600 : FontWeight.w400,
+                        color: entry.isCurrent ? accent : textS,
+                        height: 1.5,
+                      );
+                      return Padding(
+                        padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
+                        child: AnimatedDefaultTextStyle(
+                          duration: PearlMotion.durationLg,
+                          curve: PearlMotion.standard,
+                          style: baseStyle,
+                          child: Text(
+                            entry.text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    }),
+                  );
+                }
               }
-            }
-            if (lines.isEmpty) {
-              lines.add(const _LyricLineEntry(text: '...', isCurrent: true));
-            }
 
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: List.generate(lines.length, (i) {
-                final entry = lines[i];
-                return Padding(
-                  padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
-                  child: Text(
-                    entry.text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: entry.isCurrent ? 18 : 14,
-                      fontWeight: entry.isCurrent ? FontWeight.w600 : FontWeight.w400,
-                      color: entry.isCurrent ? accent : textS,
-                      height: 1.5,
-                    ),
-                  ),
-                );
-              }),
-            );
-          },
+              return Center(
+                child: AnimatedSwitcher(
+                  duration: PearlMotion.durationMd,
+                  switchInCurve: PearlMotion.standard,
+                  switchOutCurve: PearlMotion.standardIn,
+                  child: child,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -561,7 +631,8 @@ class _CurrentLyricLine extends ConsumerWidget {
 class _LyricLineEntry {
   final String text;
   final bool isCurrent;
-  const _LyricLineEntry({required this.text, required this.isCurrent});
+  final Key? key;
+  const _LyricLineEntry({required this.text, required this.isCurrent, this.key});
 }
 
 class _LyricsOverlay extends ConsumerStatefulWidget {
@@ -596,7 +667,7 @@ class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
       _scrollCtrl.jumpTo(clamped);
     } else {
       _scrollCtrl.animateTo(clamped,
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+          duration: PearlMotion.durationLg, curve: PearlMotion.emphasized);
     }
   }
 
@@ -621,8 +692,8 @@ class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: widget.controller,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      curve: PearlMotion.standard,
+      reverseCurve: PearlMotion.standardIn,
     ));
 
     return Positioned(
@@ -697,7 +768,8 @@ class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
                                 height: _kItemHeight,
                                 child: Center(
                                   child: AnimatedDefaultTextStyle(
-                                    duration: const Duration(milliseconds: 220),
+                                    duration: PearlMotion.durationMd,
+                                    curve: PearlMotion.standard,
                                     style: TextStyle(
                                       fontSize: isCurrent ? 20 : 15,
                                       fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
@@ -735,9 +807,8 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
 
   final songs = ref.read(songListProvider).valueOrNull ?? [];
 
-  showModalBottomSheet(
+  showPearlBottomSheet(
     context: context,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
       final bottomInset = MediaQuery.of(ctx).padding.bottom;
       return Container(
@@ -855,5 +926,115 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
       );
     },
   );
+}
+
+/// Fallback cover used when no online artwork is available (typically
+/// for locally-imported songs). Picks a gradient from a small palette
+/// based on the title's hash and shows the first letter large in the
+/// centre so each track is visually distinct.
+class _GradientCover extends StatelessWidget {
+  final String title;
+  final double radius;
+  final bool isDark;
+
+  const _GradientCover({
+    required this.title,
+    required this.radius,
+    required this.isDark,
+  });
+
+  static const List<List<Color>> _palette = [
+    [Color(0xFF7D8CFF), Color(0xFFB18BFF)],
+    [Color(0xFF44D3FF), Color(0xFF7D8CFF)],
+    [Color(0xFFEC4141), Color(0xFFFF8A65)],
+    [Color(0xFF31C27C), Color(0xFF66BB6A)],
+    [Color(0xFFFFB74D), Color(0xFFFF8A65)],
+    [Color(0xFFAB47BC), Color(0xFF7D8CFF)],
+    [Color(0xFF26A69A), Color(0xFF44D3FF)],
+    [Color(0xFFEF5350), Color(0xFFAB47BC)],
+  ];
+
+  /// Picks the gradient colours for [title]. Exposed as a static helper
+  /// so the player page can reuse the same palette when choosing a
+  /// matching background tint.
+  static List<Color> colorsFor(String title) {
+    if (title.isEmpty) return _palette[0];
+    final hash = title.codeUnits.fold<int>(0, (a, b) => (a * 31 + b) & 0x7fffffff);
+    return _palette[hash % _palette.length];
+  }
+
+  List<Color> _colors() => colorsFor(title);
+
+  String _letter() {
+    final t = title.trim();
+    if (t.isEmpty) return '♪';
+    // First non-ASCII character, else first ASCII letter.
+    return t.runes.first > 127 ? String.fromCharCode(t.runes.first) : t[0].toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _colors();
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: Stack(
+        children: [
+          // Subtle inner highlight for depth, mimicking real artwork lighting.
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.18),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(radius),
+              ),
+            ),
+          ),
+          // Faint musical note in the lower-right corner as a watermark.
+          Positioned(
+            right: 12,
+            bottom: 8,
+            child: Icon(
+              Icons.music_note_rounded,
+              size: 48,
+              color: Colors.white.withValues(alpha: 0.18),
+            ),
+          ),
+          // Song initial at the centre.
+          Center(
+            child: Text(
+              _letter(),
+              style: TextStyle(
+                fontSize: 96,
+                fontWeight: FontWeight.w800,
+                color: Colors.white.withValues(alpha: 0.92),
+                letterSpacing: -2,
+                height: 1,
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 

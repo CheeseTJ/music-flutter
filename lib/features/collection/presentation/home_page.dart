@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
+import '../../../core/widgets/pearl_bottom_sheet.dart';
 import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
@@ -21,7 +22,6 @@ class CollectionPage extends ConsumerStatefulWidget {
 
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   final _searchCtrl = TextEditingController();
-  String _query = '';
   bool _refreshing = false;
   FilterOption _filter = FilterOption.all;
   String _greetingText = '';
@@ -108,13 +108,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         break;
     }
 
-    if (_query.isNotEmpty) {
-      final q = _query.toLowerCase();
-      filtered = filtered.where((s) =>
-          s.title.toLowerCase().contains(q) ||
-          s.artist.toLowerCase().contains(q) ||
-          s.album.toLowerCase().contains(q)).toList();
-    }
+    // Local search now lives in the dedicated search page (which can
+    // query both the local library and online sources in parallel),
+    // so the home page no longer performs in-place filtering.
 
     return filtered;
   }
@@ -125,21 +121,6 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     notifier.setPlaylist(songs);
     notifier.play(songs.first);
     context.push('/player', extra: songs.first);
-  }
-
-  String get _filterLabel {
-    switch (_filter) {
-      case FilterOption.noLyric:
-        return '缺歌词';
-      case FilterOption.duplicates:
-        return '重名筛查';
-      case FilterOption.sortByName:
-        return '按名称';
-      case FilterOption.recent:
-        return '最近';
-      default:
-        return '';
-    }
   }
 
   bool get _hasActiveFilter => _filter != FilterOption.all;
@@ -176,37 +157,16 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 ],
               ),
               const Spacer(),
-              // Filter popup
+              // Filter popup — same visual style as the search page's
+              // source/platform dropdowns (rounded square icon, 12-radius
+              // menu, 6px offset, soft shadow).
               PopupMenuButton<FilterOption>(
-                offset: const Offset(0, 44),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: PearlColors.glassBgStrong(isDark),
-                icon: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _hasActiveFilter
-                        ? PearlColors.accent(isDark).withValues(alpha: 0.15)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.filter_list_rounded,
-                          size: 18,
-                          color: _hasActiveFilter
-                              ? PearlColors.accent(isDark)
-                              : PearlColors.textSecondary(isDark)),
-                      if (_hasActiveFilter) ...[
-                        const SizedBox(width: 4),
-                        Text(_filterLabel,
-                            style: TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w500,
-                                color: PearlColors.accent(isDark))),
-                      ],
-                    ],
-                  ),
-                ),
+                tooltip: '',
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 6),
+                elevation: 8,
+                color: PearlColors.bgSecondary(isDark),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 onSelected: (f) => setState(() => _filter = f),
                 itemBuilder: (_) => [
                   _buildFilterItem(context, '默认', FilterOption.all, Icons.format_list_bulleted_rounded, isDark),
@@ -215,6 +175,21 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   _buildFilterItem(context, '按名称排序', FilterOption.sortByName, Icons.sort_by_alpha_rounded, isDark),
                   _buildFilterItem(context, '最近添加', FilterOption.recent, Icons.access_time_rounded, isDark),
                 ],
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: _hasActiveFilter
+                        ? PearlColors.accent(isDark).withValues(alpha: 0.15)
+                        : PearlColors.glassBg(isDark),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.filter_list_rounded,
+                      size: 18,
+                      color: _hasActiveFilter
+                          ? PearlColors.accent(isDark)
+                          : PearlColors.textSecondary(isDark)),
+                ),
               ),
             ],
           ),
@@ -224,24 +199,30 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
           child: SizedBox(
             height: 52,
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _query = v),
-              decoration: InputDecoration(
-                hintText: '搜索歌曲...',
-                prefixIcon: Icon(Icons.search_rounded, size: 20,
-                    color: PearlColors.textDisabled(isDark)),
-                filled: true,
-                fillColor: PearlColors.glassBg(isDark),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(PearlTheme.radiusMd),
-                  borderSide: BorderSide.none,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push('/import/search'),
+              child: AbsorbPointer(
+                child: TextField(
+                  controller: _searchCtrl,
+                  readOnly: true,
+                  decoration: InputDecoration(
+                    hintText: '搜索本地 + 在线歌曲...',
+                    prefixIcon: Icon(Icons.search_rounded, size: 20,
+                        color: PearlColors.textDisabled(isDark)),
+                    filled: true,
+                    fillColor: PearlColors.glassBg(isDark),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(PearlTheme.radiusMd),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: PearlColors.textPrimary(isDark),
+                  ),
                 ),
-              ),
-              style: TextStyle(
-                fontSize: 14,
-                color: PearlColors.textPrimary(isDark),
               ),
             ),
           ),
@@ -304,7 +285,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             data: (songs) {
               final filtered = _applyFilter(songs);
               if (filtered.isEmpty) {
-                return _EmptyView(hasSearch: _query.isNotEmpty, isDark: isDark);
+                return _EmptyView(isDark: isDark);
               }
               return RefreshIndicator(
                 color: PearlColors.accent(isDark),
@@ -367,9 +348,8 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
   final isCurrentSong = notifier.currentSong?.id == song.id;
   final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  showModalBottomSheet(
+  showPearlBottomSheet(
     context: context,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
       final hasSong = ref.read(playerProvider.notifier).currentSong != null;
       final extraBottom = (72 + 20 + (hasSong ? 68 + 8 : 0)).toDouble();
@@ -389,7 +369,6 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
                   decoration: BoxDecoration(color: PearlColors.textDisabled(isDark), borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
               Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (song.type == 'netease')
                     SvgPicture.asset('assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg', width: 20, height: 20)
@@ -484,9 +463,8 @@ class _MenuTile extends StatelessWidget {
 }
 
 class _EmptyView extends StatelessWidget {
-  final bool hasSearch;
   final bool isDark;
-  const _EmptyView({required this.hasSearch, required this.isDark});
+  const _EmptyView({required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -494,17 +472,17 @@ class _EmptyView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(hasSearch ? Icons.search_off_rounded : Icons.headphones_rounded,
+          Icon(Icons.headphones_rounded,
               size: 56,
               color: PearlColors.textDisabled(isDark)),
           const SizedBox(height: 16),
-          Text(hasSearch ? '没有找到匹配的歌曲' : '还没有歌曲',
+          Text('还没有歌曲',
               style: TextStyle(
                 fontSize: 16,
                 color: PearlColors.textSecondary(isDark),
               )),
           const SizedBox(height: 6),
-          Text(hasSearch ? '换个关键词试试' : '上传你的第一首歌吧',
+          Text('上传你的第一首歌吧',
               style: TextStyle(
                 fontSize: 13,
                 color: PearlColors.textDisabled(isDark),
