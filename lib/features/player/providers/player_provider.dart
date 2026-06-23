@@ -7,28 +7,29 @@ import '../../../data/models/song.dart';
 import '../../../core/audio/audio_player_handler.dart';
 import '../../../data/models/lrc_parser.dart';
 import '../../../data/datasources/remote/api_client.dart';
-import '../../../core/network/itunes_cover_service.dart';
+import '../../../core/network/platform_cover_service.dart';
 
 enum PlayerPhase { idle, loading, playing, paused, error }
 
 class PlayerState {
   final PlayerPhase phase;
-  final int tick;
+  final int playMode;
   final bool lyricLoading;
   final bool lyricFailed;
-  const PlayerState(this.phase, {this.tick = 0, this.lyricLoading = false, this.lyricFailed = false});
-  PlayerState withTick(int t) => PlayerState(phase, tick: t, lyricLoading: lyricLoading, lyricFailed: lyricFailed);
-  PlayerState withLyricLoading(bool v) => PlayerState(phase, tick: tick, lyricLoading: v, lyricFailed: lyricFailed);
-  PlayerState withLyricFailed(bool v) => PlayerState(phase, tick: tick, lyricLoading: lyricLoading, lyricFailed: v);
+  const PlayerState(this.phase, {this.playMode = 0, this.lyricLoading = false, this.lyricFailed = false});
+  PlayerState copyWith({PlayerPhase? phase, int? playMode, bool? lyricLoading, bool? lyricFailed}) =>
+      PlayerState(
+        phase ?? this.phase,
+        playMode: playMode ?? this.playMode,
+        lyricLoading: lyricLoading ?? this.lyricLoading,
+        lyricFailed: lyricFailed ?? this.lyricFailed,
+      );
   factory PlayerState.idle() => const PlayerState(PlayerPhase.idle);
   factory PlayerState.loading() => const PlayerState(PlayerPhase.loading);
   factory PlayerState.playing() => const PlayerState(PlayerPhase.playing);
   factory PlayerState.paused() => const PlayerState(PlayerPhase.paused);
   factory PlayerState.error() => const PlayerState(PlayerPhase.error);
   bool get isPlaying => phase == PlayerPhase.playing;
-  bool get isPaused => phase == PlayerPhase.paused;
-  bool get hasError => phase == PlayerPhase.error;
-  bool get isLoading => phase == PlayerPhase.loading;
 }
 
 class PlayerController extends StateNotifier<PlayerState> {
@@ -37,14 +38,12 @@ class PlayerController extends StateNotifier<PlayerState> {
   Song? _currentSong;
   List<Song> _playlist = [];
   int _currentIndex = -1;
-  int _playMode = 0;
 
   String? _playingUrlId;
   String? get playingUrlId => _playingUrlId;
 
   LrcParser? _lyric;
   int _currentLyricIndex = -1;
-  int _lyricVersion = 0;
 
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
@@ -79,7 +78,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   Duration? get duration => _handler.duration;
   bool get hasNext => _currentIndex < _playlist.length - 1;
   bool get hasPrevious => _currentIndex > 0;
-  int get playMode => _playMode;
+  int get playMode => state.playMode;
   LrcParser? get lyric => _lyric;
   int get currentLyricIndex => _currentLyricIndex;
   bool get lyricLoading => state.lyricLoading;
@@ -102,8 +101,7 @@ class PlayerController extends StateNotifier<PlayerState> {
       final data = await _apiClient.getPlayUrl(song.id);
       final url = data['url'] as String;
 
-      final coverService = ITunesCoverService();
-      final coverUrl = await coverService.fetchUrl(song.title, song.artist);
+      final coverUrl = await const PlatformCoverService().fetchUrl(song.type, song.title, song.artist);
 
       await _handler.loadSong(
         url: url,
@@ -149,13 +147,12 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   Future<void> _fetchLyric(int songId) async {
-    state = state.withLyricLoading(true).withLyricFailed(false);
+    state = state.copyWith(lyricLoading: true, lyricFailed: false);
 
     final cached = _readLyricCache(songId);
     if (cached != null) {
       _lyric = LrcParser.parse(cached);
-      _lyricVersion++;
-      state = state.withTick(_lyricVersion).withLyricLoading(false);
+      state = state.copyWith(lyricLoading: false);
       return;
     }
 
@@ -164,14 +161,13 @@ class PlayerController extends StateNotifier<PlayerState> {
       if (lrcText.isNotEmpty) {
         _lyric = LrcParser.parse(lrcText);
         _writeLyricCache(songId, lrcText);
-        _lyricVersion++;
-        state = state.withTick(_lyricVersion).withLyricLoading(false);
+        state = state.copyWith(lyricLoading: false);
       } else {
-        state = state.withLyricLoading(false).withLyricFailed(true);
+        state = state.copyWith(lyricLoading: false, lyricFailed: true);
       }
     } catch (_) {
       _lyric = null;
-      state = state.withLyricLoading(false).withLyricFailed(true);
+      state = state.copyWith(lyricLoading: false, lyricFailed: true);
     }
   }
 
@@ -190,18 +186,19 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   void onSongEnd() {
-    if (_playMode == 1) {
+    if (state.playMode == 1) {
       _handler.seek(Duration.zero);
       _handler.play();
       state = PlayerState.playing();
     } else {
+      state = PlayerState.paused();
       next();
     }
   }
 
   Future<void> next() async {
     if (_playlist.isEmpty) return;
-    if (_playMode == 2) {
+    if (state.playMode == 2) {
       if (_playlist.length == 1) {
         await play(_playlist[0]);
         return;
@@ -218,7 +215,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     if (_currentIndex < _playlist.length - 1) {
       _currentIndex++;
       await play(_playlist[_currentIndex]);
-    } else if (_playMode == 0) {
+    } else if (state.playMode == 0) {
       _currentIndex = 0;
       await play(_playlist[_currentIndex]);
     }
@@ -226,7 +223,7 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   Future<void> previous() async {
     if (_playlist.isEmpty) return;
-    if (_playMode == 2) {
+    if (state.playMode == 2) {
       final rng = Random();
       var prevIdx = _currentIndex;
       while (prevIdx == _currentIndex) {
@@ -239,7 +236,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     if (_currentIndex > 0) {
       _currentIndex--;
       await play(_playlist[_currentIndex]);
-    } else if (_playMode == 0) {
+    } else if (state.playMode == 0) {
       _currentIndex = _playlist.length - 1;
       await play(_playlist[_currentIndex]);
     }
@@ -298,8 +295,8 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   void togglePlayMode() {
-    _playMode = (_playMode + 1) % 3;
-    state = state.withTick(state.tick + 1);
+    final newMode = (state.playMode + 1) % 3;
+    state = state.copyWith(playMode: newMode);
   }
 
   @override

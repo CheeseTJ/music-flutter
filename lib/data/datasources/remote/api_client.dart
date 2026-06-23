@@ -31,10 +31,11 @@ class ApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> uploadSong(String filePath, String fileName) async {
+  Future<Map<String, dynamic>> uploadSong(String filePath, String fileName, {String type = ''}) async {
     final headers = _signer.generateSignature('POST', '/upload');
     final formData = FormData.fromMap({
       'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'type': type,
     });
     try {
       final response = await _dio.post(
@@ -196,19 +197,24 @@ class ApiClient {
     return List<Map<String, dynamic>>.from(data['results'] ?? []);
   }
 
-  Future<Map<String, dynamic>> importSong(String type, int songId) async {
-    final headers = _signer.generateSignature('POST', '/import/$type');
+  Future<void> importSong(String id, String source, String name, String artist, {String? url}) async {
+    final headers = _signer.generateSignature('POST', '/import');
     try {
       final response = await _dio.post(
-        '/import/$type',
-        data: {'id': songId},
+        '/import',
+        data: {
+          'id': id,
+          'source': source,
+          'name': name,
+          'artist': artist,
+          if (url != null && url.isNotEmpty) 'url': url,
+        },
         options: Options(headers: headers),
       );
       final data = response.data as Map<String, dynamic>;
       if (data['success'] != true) {
         throw Exception(data['error'] as String? ?? '导入失败');
       }
-      return data;
     } on DioException catch (e) {
       String detail = e.message ?? '';
       if (e.response != null) {

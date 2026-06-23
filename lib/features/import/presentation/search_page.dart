@@ -1,48 +1,134 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:music_app/core/theme/pearl_colors.dart';
 import 'package:music_app/core/theme/pearl_theme.dart';
 import 'package:music_app/features/player/providers/player_provider.dart';
+import 'package:music_app/features/collection/providers/song_list_provider.dart';
 import 'package:music_app/features/import/models/song.dart';
 import 'package:music_app/features/import/music_manager.dart';
 import 'package:music_app/data/datasources/remote/api_client.dart';
-import 'package:music_app/core/network/itunes_cover_service.dart';
+import 'package:music_app/core/network/platform_cover_service.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
 
-enum _SearchSource {
-  netease;
+
+
+enum _MusicPlatform {
+  netease,
+  qq;
 
   String get label {
     switch (this) {
-      case _SearchSource.netease: return '\u7f51\u6613\u4e91';
+      case _MusicPlatform.netease: return '\u7f51\u6613\u4e91';
+      case _MusicPlatform.qq: return 'QQ\u97f3\u4e50';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _MusicPlatform.netease: return Icons.cloud_rounded;
+      case _MusicPlatform.qq: return Icons.music_note_rounded;
+    }
+  }
+
+  Color color(bool isDark) {
+    switch (this) {
+      case _MusicPlatform.netease: return const Color(0xFFEC4141);
+      case _MusicPlatform.qq: return const Color(0xFF31C27C);
+    }
+  }
+
+  String get typeKey {
+    switch (this) {
+      case _MusicPlatform.netease: return 'netease';
+      case _MusicPlatform.qq: return 'qq';
+    }
+  }
+
+  Widget platformIcon(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color(true).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(size * 0.2),
+      ),
+      child: Icon(icon, size: size * 0.7, color: color(true)),
+    );
+  }
+}
+enum _SearchSource {
+  netease,
+  bingdou,
+  net90svip,
+  ausearcher,
+  iqwq;
+
+  String get label {
+    switch (this) {
+      case _SearchSource.netease: return 'netease';
+      case _SearchSource.bingdou: return '\u51b0\u8c46';
+      case _SearchSource.net90svip: return '90Svip';
+      case _SearchSource.ausearcher: return 'AuSearch';
+      case _SearchSource.iqwq: return 'iwqw';
     }
   }
 
   IconData get icon {
     switch (this) {
       case _SearchSource.netease: return Icons.cloud_rounded;
+      case _SearchSource.bingdou: return Icons.ac_unit_rounded;
+      case _SearchSource.net90svip: return Icons.language_rounded;
+      case _SearchSource.ausearcher: return Icons.travel_explore_rounded;
+      case _SearchSource.iqwq: return Icons.waves_rounded;
     }
   }
 
   Color color(bool isDark) {
     switch (this) {
       case _SearchSource.netease: return const Color(0xFFEC4141);
+      case _SearchSource.bingdou: return const Color(0xFF4FC3F7);
+      case _SearchSource.net90svip: return const Color(0xFF26A69A);
+      case _SearchSource.ausearcher: return const Color(0xFFFF7043);
+      case _SearchSource.iqwq: return const Color(0xFFAB47BC);
     }
   }
 
-  String get platformKey {
+  String get sourceKey {
     switch (this) {
       case _SearchSource.netease: return 'netease';
+      case _SearchSource.bingdou: return 'bingdou';
+      case _SearchSource.net90svip: return 'net90svip';
+      case _SearchSource.ausearcher: return 'ausearcher';
+      case _SearchSource.iqwq: return 'iqwq';
     }
   }
 
   Widget platformIcon(double size) {
     final asset = switch (this) {
       _SearchSource.netease => 'assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg',
+      _SearchSource.bingdou => null,
+      _SearchSource.net90svip => null,
+      _SearchSource.ausearcher => null,
+      _SearchSource.iqwq => null,
     };
-    return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
+    if (asset != null) {
+      return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
+    }
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color(true).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(size * 0.2),
+      ),
+      child: Icon(icon, size: size * 0.7, color: color(true)),
+    );
   }
 }
 
@@ -60,39 +146,84 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   bool _loading = false;
   String _error = '';
   _SearchSource _activeSource = _SearchSource.netease;
+  _MusicPlatform _activePlatform = _MusicPlatform.netease;
   bool _importingSong = false;
-  final _coverService = const ITunesCoverService();
-  final Map<String, String?> _coverCache = {};
+  final _platformCover = const PlatformCoverService();
+  List<String> _history = [];
+  static const _historyKey = 'search_history';
+  static const _maxHistory = 20;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
     _loadSavedSource();
+    _loadSavedPlatform();
+    _loadHistory();
   }
 
   Future<void> _loadSavedSource() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('search_source');
     if (saved != null) {
-      final src = _SearchSource.values.where((s) => s.platformKey == saved).firstOrNull;
+      final src = _SearchSource.values.where((s) => s.sourceKey == saved).firstOrNull;
       if (src != null && mounted) setState(() => _activeSource = src);
     }
   }
 
-  Future<String?> _loadCover(String title, String artist) {
-    final key = '${title}_$artist';
-    if (_coverCache.containsKey(key)) return Future.value(_coverCache[key]);
-    return _coverService.fetchUrl(title, artist).then((url) {
-      _coverCache[key] = url;
-      return url;
-    });
+  Future<String?> _resolveCover(String title, String artist, String? coverUrl, String type) async {
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      try {
+        final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 2)));
+        final resp = await dio.head(coverUrl);
+        if (resp.statusCode == 200) return coverUrl;
+      } catch (_) {}
+    }
+    return _platformCover.fetchUrl(type, title, artist);
   }
 
+  Future<void> _loadSavedPlatform() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('music_platform');
+    if (saved != null) {
+      final plat = _MusicPlatform.values.where((p) => p.typeKey == saved).firstOrNull;
+      if (plat != null && mounted) setState(() => _activePlatform = plat);
+    }
+  }
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => _history = prefs.getStringList(_historyKey) ?? []);
+  }
+
+  Future<void> _saveHistory(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return;
+    _history.remove(q);
+    _history.insert(0, q);
+    if (_history.length > _maxHistory) _history = _history.sublist(0, _maxHistory);
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setStringList(_historyKey, _history);
+  }
+
+  Future<void> _clearHistory() async {
+    _history.clear();
+    final prefs = await SharedPreferences.getInstance();
+    prefs.remove(_historyKey);
+    setState(() {});
+  }
+
+  Future<void> _onPlatformChanged(_MusicPlatform plat) async {
+    if (plat == _activePlatform) return;
+    setState(() => _activePlatform = plat);
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('music_platform', plat.typeKey);
+    _doSearch(_searchCtrl.text);
+  }
   Future<void> _onSourceChanged(_SearchSource src) async {
     setState(() => _activeSource = src);
     final prefs = await SharedPreferences.getInstance();
-    prefs.setString('search_source', src.platformKey);
+    prefs.setString('search_source', src.sourceKey);
     _doSearch(_searchCtrl.text);
   }
 
@@ -118,10 +249,13 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       _results = [];
     });
 
+    _saveHistory(query);
+
     try {
       final mgr = ref.read(musicManagerProvider);
-      final platform = _activeSource.platformKey;
-      final results = await mgr.search(platform, query);
+      final source = _activeSource.sourceKey;
+      final musicType = _activePlatform.typeKey;
+      final results = await mgr.search(source, musicType, query);
 
       if (mounted) {
         setState(() {
@@ -187,8 +321,37 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
         }
         return;
       }
+
+      // 下载到临时文件
+      final ext = url.ext ?? (url.url.contains('.flac') ? 'flac' : url.url.contains('.m4a') ? 'm4a' : 'mp3');
+      final tempDir = await getTemporaryDirectory();
+      final tempPath = '${tempDir.path}import_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      await _downloadFile(url.url, tempPath);
+
+      // 走现有的本地上传逻辑
       final api = ref.read(apiClientProvider);
-      await api.downloadFromUrl(url.url, song.name, song.singer);
+      final result = await api.uploadSong(tempPath, '${song.singer} - ${song.name}.$ext', type: song.platform);
+      final ok = result['ok'] == true;
+
+      // 删除临时文件
+      try { await File(tempPath).delete(); } catch (_) {}
+
+      if (!ok) {
+        throw Exception(result['error']?.toString() ?? '\u4e0a\u4f20\u5931\u8d25');
+      }
+
+      // 上传歌词（如有）
+        if (url.lrc != null && url.lrc!.isNotEmpty) {
+          final songData = result['song'] as Map<String, dynamic>?;
+          final songId = songData?['id'] as int?;
+          if (songId != null) {
+            try { await api.uploadLyric(songId, url.lrc!); } catch (_) {}
+          }
+        }
+
+        // 刷新曲库列表
+        ref.read(songListProvider.notifier).load();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${song.name} \u5df2\u6dfb\u52a0\u5230\u66f2\u5e93'), backgroundColor: const Color(0xFF2E7D32)),
@@ -203,6 +366,14 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     } finally {
       if (mounted) setState(() => _importingSong = false);
     }
+  }
+
+  Future<void> _downloadFile(String url, String savePath) async {
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 60),
+    ));
+    await dio.download(url, savePath);
   }
 
   @override
@@ -256,6 +427,12 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
+                      _MusicPlatformDropdown(
+                        activePlatform: _activePlatform,
+                        isDark: isDark,
+                        onChanged: _onPlatformChanged,
+                      ),
+                      const SizedBox(width: 2),
                       _PlatformDropdown(
                         activeSource: _activeSource,
                         isDark: isDark,
@@ -279,6 +456,49 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistoryList(bool isDark, double bottomPadding) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 12, 8),
+          child: Row(
+            children: [
+              Text('\u641c\u7d22\u5386\u53f2',
+                  style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
+              const Spacer(),
+              GestureDetector(
+                onTap: _clearHistory,
+                child: Icon(Icons.delete_outline_rounded, size: 18,
+                    color: PearlColors.textDisabled(isDark)),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            itemCount: _history.length,
+            itemBuilder: (_, i) {
+              return ListTile(
+                dense: true,
+                leading: Icon(Icons.history_rounded, size: 18,
+                    color: PearlColors.textDisabled(isDark)),
+                title: Text(_history[i],
+                    style: TextStyle(fontSize: 14, color: PearlColors.textPrimary(isDark))),
+                onTap: () {
+                  _searchCtrl.text = _history[i];
+                  _searchCtrl.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _history[i].length));
+                  _doSearch(_history[i]);
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -314,6 +534,9 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     }
 
     if (_searchCtrl.text.trim().isEmpty) {
+      if (_history.isNotEmpty) {
+        return _buildHistoryList(isDark, bottomPadding);
+      }
       return Center(
         child: Padding(
           padding: EdgeInsets.only(bottom: bottomPadding),
@@ -365,9 +588,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           onImport: () => _doImport(song),
           isPlaying: songId == playingUrlId,
           playerPhase: playerPhase,
-          coverFuture: song.cover != null && song.cover!.isNotEmpty
-              ? Future.value(song.cover)
-              : _loadCover(song.name, song.singer),
+          coverFuture: _resolveCover(song.name, song.singer, song.cover, song.platform),
         );
       },
     );
@@ -384,6 +605,59 @@ Widget _placeholderIcon(Color badgeColor, IconData icon) {
   );
 }
 
+
+class _MusicPlatformDropdown extends StatelessWidget {
+  final _MusicPlatform activePlatform;
+  final bool isDark;
+  final ValueChanged<_MusicPlatform> onChanged;
+
+  const _MusicPlatformDropdown({
+    required this.activePlatform,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (d) => _showMenu(context, d.globalPosition),
+      child: activePlatform.platformIcon(30),
+    );
+  }
+
+  void _showMenu(BuildContext context, Offset position) {
+    final items = _MusicPlatform.values.map((plat) {
+      final active = plat == activePlatform;
+      return PopupMenuItem<_MusicPlatform>(
+        value: plat,
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            plat.platformIcon(22),
+            const SizedBox(width: 8),
+            Text(plat.label, style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600,
+              color: active ? plat.color(isDark) : PearlColors.textPrimary(isDark),
+            )),
+          ],
+        ),
+      );
+    }).toList();
+
+    showMenu<_MusicPlatform>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy + 4, position.dx, position.dy),
+      elevation: 4,
+      color: PearlColors.bgSecondary(isDark),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      items: items,
+    ).then((value) {
+      if (value != null) onChanged(value);
+    });
+  }
+}
 class _PlatformDropdown extends StatelessWidget {
   final _SearchSource activeSource;
   final bool isDark;
@@ -459,7 +733,7 @@ class _ResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final platformEnum = _SearchSource.values.firstWhere(
-      (s) => s.platformKey == song.platform,
+      (s) => s.sourceKey == song.platform,
       orElse: () => _SearchSource.netease,
     );
     final platformColor = platformEnum.color(isDark);

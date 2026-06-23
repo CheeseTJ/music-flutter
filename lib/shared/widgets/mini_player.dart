@@ -1,11 +1,10 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/pearl_colors.dart';
 import '../../data/models/song.dart';
-import '../../core/network/itunes_cover_service.dart';
+import '../../core/network/platform_cover_service.dart';
 import '../../features/player/providers/player_provider.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
@@ -16,7 +15,7 @@ class MiniPlayer extends ConsumerStatefulWidget {
 }
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer> {
-  Uint8List? _cover;
+  String? _coverUrl;
   int? _lastSongId;
 
   @override
@@ -31,7 +30,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
 
     if (song.id != _lastSongId) {
       _lastSongId = song.id;
-      _cover = null;
+      _coverUrl = null;
       WidgetsBinding.instance.addPostFrameCallback((_) => _fetchCover(song));
     }
 
@@ -54,26 +53,15 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: _cover != null
-                        ? Image.memory(_cover!, width: 48, height: 48, fit: BoxFit.cover)
-                        : Container(
+                    child: _coverUrl != null
+                        ? Image.network(
+                            _coverUrl!,
                             width: 48,
                             height: 48,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  PearlColors.accent(isDark),
-                                  PearlColors.accent(isDark).withValues(alpha: 0.5),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.music_note_rounded,
-                              color: PearlColors.textPrimary(isDark),
-                              size: 22,
-                            ),
-                          ),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _musicIcon(isDark),
+                          )
+                        : _musicIcon(isDark),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -123,10 +111,31 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     );
   }
 
+  Widget _musicIcon(bool isDark) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            PearlColors.accent(isDark),
+            PearlColors.accent(isDark).withValues(alpha: 0.5),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        Icons.music_note_rounded,
+        color: PearlColors.textPrimary(isDark),
+        size: 22,
+      ),
+    );
+  }
+
   Future<void> _fetchCover(Song song) async {
-    final bytes = await const ITunesCoverService().fetch(song.title, song.artist);
+    final url = await const PlatformCoverService().fetchUrl(song.type, song.title, song.artist);
     if (mounted && song.id == _lastSongId) {
-      setState(() => _cover = bytes);
+      setState(() => _coverUrl = url);
     }
   }
 }

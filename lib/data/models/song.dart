@@ -7,6 +7,7 @@ class Song {
   final int duration;
   final int size;
   final String? lyricPath;
+  final String type;
   final int createdAt;
 
   const Song({
@@ -18,6 +19,7 @@ class Song {
     required this.duration,
     required this.size,
     this.lyricPath,
+    this.type = '',
     required this.createdAt,
   });
 
@@ -31,6 +33,7 @@ class Song {
       duration: json['duration'] as int,
       size: json['size'] as int,
       lyricPath: json['lyric_path'] as String?,
+      type: json['type'] as String? ?? '',
       createdAt: json['created_at'] as int,
     );
   }
@@ -45,6 +48,7 @@ class Song {
       'duration': duration,
       'size': size,
       'lyric_path': lyricPath,
+      'type': type,
       'created_at': createdAt,
     };
   }

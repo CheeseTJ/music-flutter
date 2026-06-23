@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
@@ -387,8 +388,20 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
               Container(width: 40, height: 4,
                   decoration: BoxDecoration(color: PearlColors.textDisabled(isDark), borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
-              Text(song.title,
-                  style: TextStyle(color: PearlColors.textPrimary(isDark), fontSize: 17, fontWeight: FontWeight.w600)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (song.type == 'netease')
+                    SvgPicture.asset('assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg', width: 20, height: 20)
+                  else if (song.type == 'qq')
+                    SvgPicture.asset('assets/icons/QQ\u97f3\u4e50.svg', width: 20, height: 20),
+                  if (song.type.isNotEmpty) const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(song.title,
+                        style: TextStyle(color: PearlColors.textPrimary(isDark), fontSize: 17, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
               const SizedBox(height: 4),
               Text('${song.artist} · ${song.durationFormatted}',
                   style: TextStyle(color: PearlColors.textSecondary(isDark), fontSize: 13)),

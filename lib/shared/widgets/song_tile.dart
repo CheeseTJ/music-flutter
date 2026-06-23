@@ -1,10 +1,9 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_theme.dart';
 import '../../data/models/song.dart';
-import '../../core/network/itunes_cover_service.dart';
+import '../../core/network/platform_cover_service.dart';
 
 class SongTile extends ConsumerStatefulWidget {
   final Song song;
@@ -18,7 +17,7 @@ class SongTile extends ConsumerStatefulWidget {
 }
 
 class _SongTileState extends ConsumerState<SongTile> {
-  Uint8List? _cover;
+  String? _coverUrl;
 
   @override
   void initState() {
@@ -29,15 +28,21 @@ class _SongTileState extends ConsumerState<SongTile> {
   @override
   void didUpdateWidget(covariant SongTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.song.id != widget.song.id) {
-      _cover = null;
+    if (oldWidget.song.id != widget.song.id ||
+        oldWidget.song.title != widget.song.title ||
+        oldWidget.song.artist != widget.song.artist) {
+      _coverUrl = null;
       _fetchCover();
     }
   }
 
   Future<void> _fetchCover() async {
-    final bytes = await const ITunesCoverService().fetch(widget.song.title, widget.song.artist);
-    if (mounted) setState(() => _cover = bytes);
+    final url = await const PlatformCoverService().fetchUrl(
+      widget.song.type,
+      widget.song.title,
+      widget.song.artist,
+    );
+    if (mounted) setState(() => _coverUrl = url);
   }
 
   @override
@@ -106,8 +111,24 @@ class _SongTileState extends ConsumerState<SongTile> {
   Widget _buildCover(bool isDark) {
     final accent = PearlColors.accent(isDark);
 
-    if (_cover != null) {
-      return Image.memory(_cover!, width: 56, height: 56, fit: BoxFit.cover);
+    if (_coverUrl != null) {
+      return Image.network(
+        _coverUrl!,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(PearlTheme.radiusSm),
+          ),
+          child: Center(
+            child: Icon(Icons.music_note_rounded, size: 24, color: accent.withValues(alpha: 0.5)),
+          ),
+        ),
+      );
     }
     return Container(
       width: 56,

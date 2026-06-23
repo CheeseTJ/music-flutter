@@ -1,7 +1,7 @@
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import '../models/song.dart';
 
-/// qijieya Meting API — 网易云音乐搜索+播放
+/// qijieya Meting API — 多平台音乐搜索+播放
 /// 无需鉴权，URL 端点返回 302 真实直链
 class NeteaseQijieyaProvider {
   final Dio _dio;
@@ -10,10 +10,23 @@ class NeteaseQijieyaProvider {
 
   NeteaseQijieyaProvider(this._dio);
 
+  /// musicType -> meting server name
+  static String _serverFor(String musicType) {
+    switch (musicType) {
+      case 'netease': return 'netease';
+      case 'qq': return 'tencent';
+      case 'kugou': return 'kugou';
+      case 'kuwo': return 'kuwo';
+      default: return 'netease';
+    }
+  }
+
   /// 搜索
-  Future<List<Song>> search(String keyword, {int page = 1, int limit = 30}) async {
+  Future<List<Song>> search(String keyword, {String musicType = 'netease', int page = 1, int limit = 30}) async {
     try {
+      final server = _serverFor(musicType);
       final resp = await _dio.get(_base, queryParameters: {
+        'server': server,
         'type': 'search',
         'id': keyword,
         'limit': limit,
@@ -23,13 +36,14 @@ class NeteaseQijieyaProvider {
       final list = resp.data as List? ?? [];
       return list.map((item) {
         return Song(
-          platform: 'netease',
+          platform: musicType,
           source: 'qijieya',
           id: _extractId(item['url']),
           name: item['name']?.toString() ?? '',
           singer: item['artist']?.toString() ?? '',
           album: '',
           cover: item['pic']?.toString(),
+          extra: {'server': server},
         );
       }).toList();
     } catch (_) {
@@ -38,10 +52,10 @@ class NeteaseQijieyaProvider {
   }
 
   /// 获取播放链接 — Dio 不跟随 302，取 Location 头
-  Future<SongUrl?> getUrl(String songId, {int br = 320}) async {
+  Future<SongUrl?> getUrl(String songId, {String server = 'netease', int br = 320}) async {
     try {
       final resp = await _dio.get(_base, queryParameters: {
-        'server': 'netease',
+        'server': server,
         'type': 'url',
         'id': songId,
         'br': br,

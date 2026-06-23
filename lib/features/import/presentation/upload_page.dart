@@ -156,7 +156,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: PearlColors.glassBg(isDark),
+                      color: PearlColors.bgTertiary(isDark),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(fmt.toUpperCase(),
@@ -263,7 +263,7 @@ class _ImportCard extends StatelessWidget {
         width: double.infinity,
         height: 160,
         decoration: BoxDecoration(
-          color: PearlColors.glassBg(isDark),
+          color: PearlColors.bgTertiary(isDark),
           borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
         ),
         child: Stack(
@@ -335,7 +335,7 @@ class _QueueItemTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: PearlColors.glassBg(isDark),
+          color: PearlColors.bgTertiary(isDark),
           borderRadius: BorderRadius.circular(PearlTheme.radiusMd),
         ),
         child: Row(

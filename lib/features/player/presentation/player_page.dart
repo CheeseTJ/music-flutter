@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
@@ -7,7 +8,7 @@ import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
 import '../../../core/utils/color_extractor.dart';
 import '../../../data/models/song.dart';
-import '../../../core/network/itunes_cover_service.dart';
+import '../../../core/network/platform_cover_service.dart';
 import '../../player/providers/player_provider.dart';
 import '../../collection/providers/song_list_provider.dart';
 
@@ -21,7 +22,7 @@ class PlayerPage extends ConsumerStatefulWidget {
 
 class _PlayerPageState extends ConsumerState<PlayerPage>
     with TickerProviderStateMixin {
-  Uint8List? _cover;
+  String? _coverUrl;
   Color _bgColor = const Color(0xFF7D8CFF);
   int? _lastSongId;
   late final AnimationController _bgCtrl;
@@ -65,15 +66,40 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   Future<void> _fetchCover(Song song) async {
-    _lastSongId = song.id;
-    final bytes = await const ITunesCoverService()
-        .fetch(song.title, song.artist);
-    if (mounted && _lastSongId == song.id && bytes != null) {
-      extractDominantColor(bytes).then((c) {
-        if (mounted && _lastSongId == song.id) setState(() => _bgColor = c);
-      });
-      setState(() => _cover = bytes);
+    final id = song.id;
+    _lastSongId = id;
+
+    final url = await const PlatformCoverService().fetchUrl(
+      song.type, song.title, song.artist,
+    );
+    if (!mounted || _lastSongId != id) return;
+    setState(() => _coverUrl = url);
+
+    if (url != null) {
+      _extractColorFromUrl(url, id);
     }
+  }
+
+  Future<void> _extractColorFromUrl(String url, int songId) async {
+    try {
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      try {
+        final req = await client.getUrl(Uri.parse(url));
+        final resp = await req.close().timeout(const Duration(seconds: 6));
+        if (resp.statusCode != 200) return;
+
+        final bytes = await resp.fold<List<int>>(
+          <int>[], (prev, chunk) => prev..addAll(chunk),
+        );
+        if (!mounted || _lastSongId != songId) return;
+        final color = await extractDominantColor(Uint8List.fromList(bytes));
+        if (mounted && _lastSongId == songId) {
+          setState(() => _bgColor = color);
+        }
+      } finally {
+        client.close();
+      }
+    } catch (_) {}
   }
 
   void _toggleLyrics() {
@@ -97,7 +123,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final size = MediaQuery.of(context).size;
 
     if (song.id != _lastSongId) {
-      _cover = null;
+      _coverUrl = null;
       _bgColor = const Color(0xFF7D8CFF);
       WidgetsBinding.instance.addPostFrameCallback((_) => _fetchCover(song));
     }
@@ -211,8 +237,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-              child: _cover != null
-                  ? Image.memory(_cover!, fit: BoxFit.cover)
+              child: _coverUrl != null
+                  ? Image.network(_coverUrl!, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: BoxDecoration(
+                          color: PearlColors.glassBg(isDark),
+                          borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+                        ),
+                        child: Center(
+                          child: Icon(Icons.music_note_rounded, size: 80,
+                              color: Colors.white.withValues(alpha: 0.2)),
+                        ),
+                      ))
                   : Container(
                       decoration: BoxDecoration(
                         color: PearlColors.glassBg(isDark),
@@ -358,8 +394,10 @@ class _PlayerControlsBar extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _SmallBtn(
-            icon: Icons.shuffle_rounded,
-            selected: notifier.playMode == 2,
+            icon: state.playMode == 2 ? Icons.shuffle_rounded
+                : state.playMode == 1 ? Icons.repeat_one_rounded
+                : Icons.repeat_rounded,
+            selected: state.playMode != 0,
             isDark: isDark,
             onTap: () => notifier.togglePlayMode(),
           ),
