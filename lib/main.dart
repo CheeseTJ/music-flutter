@@ -3,11 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/debug/layout_debug.dart';
+import 'core/network/platform_cover_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Catch ParentDataWidget errors early and dump the widget tree /
-  // stack so we can locate the offending Row/Column.
   LayoutDebug.installLayoutDebugger();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -15,5 +14,6 @@ void main() {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+  PlatformCoverService.preloadCache();
   runApp(const ProviderScope(child: MusicApp()));
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/song.dart';
 import '../../../data/datasources/remote/api_client.dart';
@@ -16,21 +17,24 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
   }
 
   Future<void> _init() async {
-    _loadCacheSync();
+    await _loadCacheAsync();
     await load();
   }
 
-  void _loadCacheSync() {
+  Future<void> _loadCacheAsync() async {
     try {
       final file = File(_cachePath);
-      if (file.existsSync()) {
-        final json = file.readAsStringSync();
-        final list = (jsonDecode(json) as List)
-            .map((j) => Song.fromJson(j as Map<String, dynamic>))
-            .toList();
-        if (list.isNotEmpty) state = AsyncData(list);
-      }
+      if (!await file.exists()) return;
+      final json = await file.readAsString();
+      final list = await compute(_parseSongList, json);
+      if (list.isNotEmpty) state = AsyncData(list);
     } catch (_) {}
+  }
+
+  static List<Song> _parseSongList(String json) {
+    return (jsonDecode(json) as List)
+        .map((j) => Song.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> _saveCache(List<Song> songs) async {

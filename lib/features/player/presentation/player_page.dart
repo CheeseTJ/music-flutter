@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/animation/pearl_motion.dart';
@@ -49,6 +50,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
     _bgCtrl.repeat();
     _fadeCtrl.forward();
+    _coverUrl = PlatformCoverService.getCachedUrl(
+      widget.song.type, widget.song.title, widget.song.artist,
+    );
     _fetchCover(widget.song);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -260,12 +264,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
               child: _coverUrl != null
-                  ? Image.network(_coverUrl!, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _GradientCover(
+                  ? CachedNetworkImage(
+                      imageUrl: _coverUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => _GradientCover(
                         title: song.title,
                         radius: PearlTheme.radiusXl,
                         isDark: isDark,
-                      ))
+                      ),
+                      errorWidget: (_, __, ___) => _GradientCover(
+                        title: song.title,
+                        radius: PearlTheme.radiusXl,
+                        isDark: isDark,
+                      ),
+                    )
                   : _GradientCover(
                       title: song.title,
                       radius: PearlTheme.radiusXl,
@@ -498,7 +510,7 @@ class _SmallBtn extends StatelessWidget {
   }
 }
 
-class _CurrentLyricLine extends ConsumerWidget {
+class _CurrentLyricLine extends ConsumerStatefulWidget {
   final Song song;
   final bool isDark;
   final VoidCallback onTap;
@@ -508,30 +520,26 @@ class _CurrentLyricLine extends ConsumerWidget {
     required this.onTap,
   });
 
-  // The lyrics preview shows up to 5 lines (current ± 2). The previous
-  // implementation used `mainAxisSize: min`, which meant the widget grew
-  // from 1 line ("加载歌词中...") to 5 lines once the lyrics loaded, and
-  // the surrounding `Spacer`s in `_buildMainContent` shifted the artwork
-  // and controls as a result. We reserve a fixed height up-front so the
-  // surrounding layout never moves when the lyrics arrive.
-  //
-  // Height math (5 lines):
-  //   current line  : 18 * 1.5 = 27
-  //   4 context     : 14 * 1.5 = 21 each
-  //   4 paddings    : 10 each between non-first lines
-  //   total         : 27 + 4*21 + 4*10 = 151
-  //   + ~10px slack = 160
+  @override
+  ConsumerState<_CurrentLyricLine> createState() => _CurrentLyricLineState();
+}
+
+class _CurrentLyricLineState extends ConsumerState<_CurrentLyricLine> {
+  int _prevIdx = -1;
+  int _direction = 0;
+
   static const double _kLyricPreviewHeight = 160;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final state = ref.watch(playerProvider);
     final notifier = ref.watch(playerProvider.notifier);
+    final isDark = widget.isDark;
     final textS = PearlColors.textSecondary(isDark);
     final accent = PearlColors.accent(isDark);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         height: _kLyricPreviewHeight,
@@ -540,84 +548,102 @@ class _CurrentLyricLine extends ConsumerWidget {
           child: StreamBuilder<Duration>(
             stream: notifier.player.positionStream,
             builder: (context, snapshot) {
-              // AnimatedSwitcher cross-fades between "loading / no lyrics"
-              // and the 5-line preview so the user sees a soft transition
-              // rather than a sudden appearance.
+              final lyric = notifier.lyric;
+
+              // 1. Lyric loaded with lines → show lyric group
+              // 2. lyricFailed → confirmed no lyric
+              // 3. Otherwise (lyric null, not failed) → still loading
               final Widget child;
-              if (state.lyricLoading) {
+              Key groupKey = const ValueKey<String>('lyric-loading');
+
+              if (lyric != null && lyric.lines.isNotEmpty) {
+                final position = snapshot.data ?? Duration.zero;
+                final idx = lyric.findIndex(position);
+
+                if (idx != _prevIdx) {
+                  _direction = idx > _prevIdx ? 1 : -1;
+                  _prevIdx = idx;
+                }
+
+                groupKey = ValueKey<int>(idx);
+
+                final lines = <_LyricLineEntry>[];
+                for (var i = -2; i <= 2; i++) {
+                  final lineIdx = idx + i;
+                  if (lineIdx >= 0 && lineIdx < lyric.lines.length) {
+                    lines.add(_LyricLineEntry(
+                      text: lyric.lines[lineIdx].text,
+                      isCurrent: i == 0,
+                      offset: i,
+                    ));
+                  }
+                }
+                if (lines.isEmpty) {
+                  lines.add(const _LyricLineEntry(text: '...', isCurrent: true, offset: 0));
+                }
+
+                child = Column(
+                  key: groupKey,
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: List.generate(lines.length, (i) {
+                    final entry = lines[i];
+                    return Padding(
+                      padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+                      child: AnimatedDefaultTextStyle(
+                        duration: PearlMotion.durationLg,
+                        curve: PearlMotion.standard,
+                        style: TextStyle(
+                          fontSize: entry.isCurrent ? 20 : 14,
+                          fontWeight: entry.isCurrent ? FontWeight.w700 : FontWeight.w400,
+                          color: entry.isCurrent ? accent : textS,
+                          height: 1.5,
+                        ),
+                        child: Text(
+                          entry.text,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              } else if (state.lyricFailed) {
+                child = Text('暂无歌词',
+                    key: const ValueKey('lyric-empty'),
+                    style: TextStyle(fontSize: 14, color: textS));
+              } else {
                 child = Text('加载歌词中...',
                     key: const ValueKey('lyric-loading'),
                     style: TextStyle(fontSize: 14, color: textS));
-              } else {
-                final lyric = notifier.lyric;
-                if (lyric == null || lyric.lines.isEmpty) {
-                  child = Text('暂无歌词',
-                      key: const ValueKey('lyric-empty'),
-                      style: TextStyle(fontSize: 14, color: textS));
-                } else {
-                  final position = snapshot.data ?? Duration.zero;
-                  final idx = lyric.findIndex(position);
-
-                  final lines = <_LyricLineEntry>[];
-                  for (var i = -2; i <= 2; i++) {
-                    final lineIdx = idx + i;
-                    if (lineIdx >= 0 && lineIdx < lyric.lines.length) {
-                      lines.add(_LyricLineEntry(
-                        text: lyric.lines[lineIdx].text,
-                        isCurrent: i == 0,
-                        // Stable identity for AnimatedSwitcher so we can
-                        // animate the highlighted line sliding through the
-                        // preview as the playhead advances.
-                        key: ValueKey<String>('line-$lineIdx'),
-                      ));
-                    }
-                  }
-                  if (lines.isEmpty) {
-                    lines.add(const _LyricLineEntry(text: '...', isCurrent: true));
-                  }
-
-                  child = Column(
-                    key: const ValueKey('lyric-loaded'),
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: List.generate(lines.length, (i) {
-                      final entry = lines[i];
-                      // AnimatedDefaultTextStyle smoothly tweens font size,
-                      // weight and color so the "current" highlight glides
-                      // down a row as the playhead advances, instead of
-                      // snapping from one line to the next.
-                      final baseStyle = TextStyle(
-                        fontSize: entry.isCurrent ? 18 : 14,
-                        fontWeight: entry.isCurrent ? FontWeight.w600 : FontWeight.w400,
-                        color: entry.isCurrent ? accent : textS,
-                        height: 1.5,
-                      );
-                      return Padding(
-                        padding: EdgeInsets.only(top: i == 0 ? 0 : 10),
-                        child: AnimatedDefaultTextStyle(
-                          duration: PearlMotion.durationLg,
-                          curve: PearlMotion.standard,
-                          style: baseStyle,
-                          child: Text(
-                            entry.text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    }),
-                  );
-                }
               }
 
               return Center(
-                child: AnimatedSwitcher(
-                  duration: PearlMotion.durationMd,
-                  switchInCurve: PearlMotion.standard,
-                  switchOutCurve: PearlMotion.standardIn,
-                  child: child,
+                child: ClipRect(
+                  child: AnimatedSwitcher(
+                    duration: PearlMotion.durationLg,
+                    switchInCurve: PearlMotion.standard,
+                    switchOutCurve: PearlMotion.standardIn,
+                    transitionBuilder: (widget, anim) {
+                      // Lyric group changes → slide transition
+                      if (widget.key is ValueKey<int>) {
+                        final isIncoming = widget.key == groupKey;
+                        final dy = _direction >= 0 ? 0.2 : -0.2;
+                        return SlideTransition(
+                          position: Tween<Offset>(
+                            begin: Offset(0, isIncoming ? dy : -dy),
+                            end: Offset.zero,
+                          ).animate(anim),
+                          child: FadeTransition(opacity: anim, child: widget),
+                        );
+                      }
+                      // Loading / empty state → fade only
+                      return FadeTransition(opacity: anim, child: widget);
+                    },
+                    child: child,
+                  ),
                 ),
               );
             },
@@ -631,8 +657,8 @@ class _CurrentLyricLine extends ConsumerWidget {
 class _LyricLineEntry {
   final String text;
   final bool isCurrent;
-  final Key? key;
-  const _LyricLineEntry({required this.text, required this.isCurrent, this.key});
+  final int offset;
+  const _LyricLineEntry({required this.text, required this.isCurrent, this.offset = 0});
 }
 
 class _LyricsOverlay extends ConsumerStatefulWidget {

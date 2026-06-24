@@ -28,8 +28,8 @@ class ITunesCoverService {
     if (cached != null) return cached;
 
     final cacheFile = File('${Directory.systemTemp.path}/itunes_cover_$key.jpg');
-    if (cacheFile.existsSync()) {
-      final bytes = cacheFile.readAsBytesSync();
+    if (await cacheFile.exists()) {
+      final bytes = await cacheFile.readAsBytes();
       _memory[key] = bytes;
       return bytes;
     }
@@ -41,7 +41,7 @@ class ITunesCoverService {
       final bytes = await _download(artworkUrl);
       if (bytes != null) {
         _memory[key] = bytes;
-        cacheFile.writeAsBytesSync(bytes);
+        await cacheFile.writeAsBytes(bytes);
       }
       return bytes;
     } catch (_) {

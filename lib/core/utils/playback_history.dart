@@ -62,7 +62,7 @@ class PlaybackHistory {
     _cacheDir = await getCacheDir();
     try {
       final file = File(_path);
-      if (file.existsSync()) {
+      if (await file.exists()) {
         final list = (jsonDecode(await file.readAsString()) as List)
             .map((e) => PlayRecord.fromJson(e as Map<String, dynamic>))
             .toList();

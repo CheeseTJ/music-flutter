@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
+import '../../../core/utils/settings.dart';
 import '../../../core/widgets/pearl_bottom_sheet.dart';
 import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
@@ -22,6 +23,7 @@ class CollectionPage extends ConsumerStatefulWidget {
 
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   final _searchCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
   bool _refreshing = false;
   FilterOption _filter = FilterOption.all;
   String _greetingText = '';
@@ -38,6 +40,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   void dispose() {
     _greetingTimer?.cancel();
     _searchCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -128,7 +131,17 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   @override
   Widget build(BuildContext context) {
     final songsAsync = ref.watch(songListProvider);
+    final playerState = ref.watch(playerProvider);
+    final currentSong = ref.watch(playerProvider.notifier).currentSong;
+    final hasSong = currentSong != null;
+    final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Tab bar: 64 height + 16 bottom padding + safe area
+    // Mini player: 68 height + 8 gap (only when song exists and setting is on)
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final miniPlayerHeight = (hasSong && showMiniPlayer) ? 68.0 + 8.0 : 0.0;
+    final listBottomPadding = 64.0 + 16.0 + bottomInset + miniPlayerHeight + 16.0;
 
     return Column(
       children: [
@@ -291,22 +304,37 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 color: PearlColors.accent(isDark),
                 backgroundColor: PearlColors.glassBgStrong(isDark),
                 onRefresh: () => _doRefresh(ref),
-                child: ListView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    bottom: 72 + 20 + MediaQuery.of(context).padding.bottom + 24),
-                  itemCount: filtered.length,
-                  itemBuilder: (_, i) {
-                    final song = filtered[i];
-                    return SongTile(
-                      song: song,
-                      onTap: () {
-                        ref.read(playerProvider.notifier).setPlaylist(songs);
-                        context.push('/player', extra: song);
-                      },
-                      onLongPress: () => _showSongMenu(context, ref, song),
-                    );
-                  },
+                child: Scrollbar(
+                  controller: _scrollCtrl,
+                  thumbVisibility: true,
+                  interactive: true,
+                  radius: const Radius.circular(4),
+                  thickness: 4,
+                  child: ListView.builder(
+                    controller: _scrollCtrl,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    // ignore: deprecated_member_use
+                    cacheExtent: 2000,
+                    padding: EdgeInsets.only(bottom: listBottomPadding),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final song = filtered[i];
+                      final isCurrent = currentSong?.id == song.id;
+                      return RepaintBoundary(
+                        child: SongTile(
+                          key: ValueKey(song.id),
+                          song: song,
+                          isPlaying: isCurrent,
+                          isPaused: playerState.phase == PlayerPhase.paused,
+                          onTap: () {
+                            ref.read(playerProvider.notifier).setPlaylist(songs);
+                            context.push('/player', extra: song);
+                          },
+                          onLongPress: () => _showSongMenu(context, ref, song),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               );
             },

@@ -17,6 +17,7 @@ import 'package:music_app/features/import/music_manager.dart';
 import 'package:music_app/data/datasources/remote/api_client.dart';
 import 'package:music_app/data/models/song.dart' as local_song;
 import 'package:music_app/core/network/platform_cover_service.dart';
+import 'package:music_app/core/utils/settings.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
 
 
@@ -505,8 +506,9 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     final playingUrlId = notifier.playingUrlId;
     final playerPhase = ref.watch(playerProvider.select((v) => v.phase));
     final hasSong = playingUrlId != null && playerPhase != PlayerPhase.idle && playerPhase != PlayerPhase.error;
+    final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final bottomPadding = bottomInset + 24 + (hasSong ? 80 : 0);
+    final bottomPadding = bottomInset + 24 + (hasSong && showMiniPlayer ? 80 : 0);
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -578,7 +580,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                 ),
               ],
             ),
-            if (hasSong)
+            if (hasSong && showMiniPlayer)
               Positioned(
                 left: 16,
                 right: 16,

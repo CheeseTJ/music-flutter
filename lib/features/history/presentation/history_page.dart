@@ -111,6 +111,7 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
                   itemBuilder: (ctx, i) {
                     final r = _records[i];
                     return SongTile(
+                      key: ValueKey('history_${r.songId}_${r.playedAt}'),
                       song: _toSong(r),
                       onTap: () {
                         context.push('/player', extra: {

@@ -34,20 +34,9 @@ class _FloatingTabBarState extends State<FloatingTabBar> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Reserve a slot on the right for the upload button when it's
-    // visible, so the capsule can fit alongside it without overlap.
-    const uploadButtonSlot = 48.0 + 8.0; // diameter + gap
-    final capsuleWidth = widget.showUploadButton
-        ? screenWidth - 32 - uploadButtonSlot
-        : screenWidth * 0.78;
-    final itemWidth = capsuleWidth / _tabs.length;
     const indicatorWidth = 36.0;
     const tabHeight = 64.0;
     const tabRadius = 32.0;
-    final indicatorLeft =
-        itemWidth * widget.currentIndex + (itemWidth - indicatorWidth) / 2;
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -85,102 +74,111 @@ class _FloatingTabBarState extends State<FloatingTabBar> {
                       width: 0.5,
                     ),
                   ),
-                  child: Stack(
-                    children: [
-                      AnimatedPositioned(
-                        duration: PearlMotion.durationMd,
-                        curve: PearlMotion.standard,
-                        left: indicatorLeft,
-                        bottom: 8,
-                        child: Container(
-                          width: indicatorWidth,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                PearlColors.accent(isDark),
-                                const Color(0xFF9B8BFF),
-                              ],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: List.generate(_tabs.length, (i) {
-                          final selected = i == widget.currentIndex;
-                          final accent = PearlColors.accent(isDark);
-                          final accentGradient = LinearGradient(
-                            colors: [accent, const Color(0xFF9B8BFF)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          );
-                          final unselectedColor =
-                              PearlColors.textDisabled(isDark);
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final capsuleWidth = constraints.maxWidth;
+                      final itemWidth = capsuleWidth / _tabs.length;
+                      final indicatorLeft =
+                          itemWidth * widget.currentIndex + (itemWidth - indicatorWidth) / 2;
 
-                          return Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () => widget.onTap(i),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const SizedBox(height: 4),
-                                  AnimatedSwitcher(
-                                    duration: PearlMotion.durationMd,
-                                    switchInCurve: PearlMotion.standard,
-                                    switchOutCurve: PearlMotion.standardIn,
-                                    transitionBuilder: (child, anim) =>
-                                        FadeTransition(opacity: anim, child: child),
-                                    child: ShaderMask(
-                                      key: ValueKey(selected),
-                                      shaderCallback: (bounds) => selected
-                                          ? accentGradient.createShader(bounds)
-                                          : LinearGradient(colors: [
-                                              unselectedColor,
-                                              unselectedColor
-                                            ]).createShader(bounds),
-                                      child: Icon(
-                                        _tabs[i].icon,
-                                        size: 22,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  AnimatedSize(
-                                    duration: PearlMotion.durationMd,
-                                    curve: PearlMotion.standard,
-                                    child: AnimatedOpacity(
-                                      duration: PearlMotion.durationMd,
-                                      curve: PearlMotion.standard,
-                                      opacity: selected ? 1.0 : 0.0,
-                                      child: selected
-                                          ? ShaderMask(
-                                              shaderCallback: (bounds) =>
-                                                  accentGradient.createShader(bounds),
-                                              child: Text(
-                                                _tabs[i].label,
-                                                style: const TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            )
-                                          : const SizedBox(width: 0, height: 0),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                ],
+                      return Stack(
+                        children: [
+                          AnimatedPositioned(
+                            duration: PearlMotion.durationMd,
+                            curve: PearlMotion.standard,
+                            left: indicatorLeft,
+                            bottom: 8,
+                            child: Container(
+                              width: indicatorWidth,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    PearlColors.accent(isDark),
+                                    const Color(0xFF9B8BFF),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
-                          );
-                        }),
-                      ),
-                    ],
+                          ),
+                          Row(
+                            children: List.generate(_tabs.length, (i) {
+                              final selected = i == widget.currentIndex;
+                              final accent = PearlColors.accent(isDark);
+                              final accentGradient = LinearGradient(
+                                colors: [accent, const Color(0xFF9B8BFF)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              );
+                              final unselectedColor =
+                                  PearlColors.textDisabled(isDark);
+
+                              return Expanded(
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () => widget.onTap(i),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const SizedBox(height: 4),
+                                      AnimatedSwitcher(
+                                        duration: PearlMotion.durationMd,
+                                        switchInCurve: PearlMotion.standard,
+                                        switchOutCurve: PearlMotion.standardIn,
+                                        transitionBuilder: (child, anim) =>
+                                            FadeTransition(opacity: anim, child: child),
+                                        child: ShaderMask(
+                                          key: ValueKey(selected),
+                                          shaderCallback: (bounds) => selected
+                                              ? accentGradient.createShader(bounds)
+                                              : LinearGradient(colors: [
+                                                  unselectedColor,
+                                                  unselectedColor
+                                                ]).createShader(bounds),
+                                          child: Icon(
+                                            _tabs[i].icon,
+                                            size: 22,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      AnimatedSize(
+                                        duration: PearlMotion.durationMd,
+                                        curve: PearlMotion.standard,
+                                        child: AnimatedOpacity(
+                                          duration: PearlMotion.durationMd,
+                                          curve: PearlMotion.standard,
+                                          opacity: selected ? 1.0 : 0.0,
+                                          child: selected
+                                              ? ShaderMask(
+                                                  shaderCallback: (bounds) =>
+                                                      accentGradient.createShader(bounds),
+                                                  child: Text(
+                                                    _tabs[i].label,
+                                                    style: const TextStyle(
+                                                      fontSize: 9,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                )
+                                              : const SizedBox(width: 0, height: 0),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),

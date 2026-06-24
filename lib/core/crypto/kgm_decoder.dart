@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class KgmDecoder {
@@ -57,8 +58,8 @@ class KgmDecoder {
     _keyLoading = true;
     try {
       final gzData = await rootBundle.load('assets/kugou_key.gz');
-      final decoded = gzip.decode(gzData.buffer.asUint8List());
-      _pubKeyLarge = Uint8List.fromList(decoded);
+      final decoded = await compute(_decodeGzip, gzData.buffer.asUint8List());
+      _pubKeyLarge = decoded;
     } finally {
       _keyLoading = false;
       for (final callback in _keyLoadCallbacks) {
@@ -66,6 +67,10 @@ class KgmDecoder {
       }
       _keyLoadCallbacks.clear();
     }
+  }
+
+  static Uint8List _decodeGzip(Uint8List data) {
+    return Uint8List.fromList(gzip.decode(data));
   }
 
   static bool isKgmFile(String filePath) {
@@ -106,7 +111,7 @@ class KgmDecoder {
       }
       ownKey[16] = 0;
 
-      final detectedExtension = _detectDecimalExtension(raf, ownKey);
+      final detectedExtension = await _detectDecimalExtension(raf, ownKey);
       final extension = detectedExtension;
 
       final outPath = outputPath != null
@@ -136,12 +141,12 @@ class KgmDecoder {
     return true;
   }
 
-  static String _detectDecimalExtension(RandomAccessFile input, Uint8List ownKey) {
+  static Future<String> _detectDecimalExtension(RandomAccessFile input, Uint8List ownKey) async {
     const sampleSize = 8192;
     final encrypted = Uint8List(sampleSize);
-    final bytesRead = input.readIntoSync(encrypted, 0, sampleSize);
+    final bytesRead = await input.readInto(encrypted, 0, sampleSize);
 
-    input.setPositionSync(_headerLen);
+    await input.setPosition(_headerLen);
 
     final decoded = _decodeBytes(encrypted, ownKey, 0, bytesRead);
 

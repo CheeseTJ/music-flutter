@@ -22,6 +22,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasSong = ref.watch(playerProvider.notifier).currentSong != null;
+    final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final showUploadButton = ref.watch(showUploadButtonProvider);
     final navShell = widget.navigationShell;
     final currentIndex = navShell.currentIndex;
@@ -44,7 +45,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
             ),
           ),
           // Mini player above the floating tab bar (only when there's a song)
-          if (hasSong)
+          if (hasSong && showMiniPlayer)
             Positioned(
               left: 0, right: 0, bottom: 0,
               child: _MiniPlayerHolder(),
@@ -68,15 +69,15 @@ class _ShellPageState extends ConsumerState<ShellPage> {
 }
 
 class _MiniPlayerHolder extends StatelessWidget {
+  const _MiniPlayerHolder();
+
   @override
   Widget build(BuildContext context) {
     // tab bar height (64) + bottom padding (16 + safeArea)
     final bottomInset = MediaQuery.of(context).padding.bottom;
     const bottom = 64.0 + 16.0 + 8.0;
     return Padding(
-      padding: EdgeInsets.only(
-        left: 12, right: 12, bottom: bottom + bottomInset,
-      ),
+      padding: EdgeInsets.only(bottom: bottom + bottomInset),
       child: const MiniPlayer(),
     );
   }
