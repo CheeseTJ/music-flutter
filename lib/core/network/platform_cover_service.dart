@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'itunes_cover_service.dart';
+import '../../features/import/providers/provider_config_service.dart';
 
 class PlatformCoverService {
   static final Map<String, String?> _cache = {};
@@ -106,8 +107,9 @@ class PlatformCoverService {
 
   Future<String?> _searchMeting(String server, String title, String artist) async {
     final query = Uri.encodeComponent('$title $artist');
-    final url =
-        'https://api.qijieya.cn/meting/?server=$server&type=search&id=$query&limit=1';
+    final base = ProviderConfigService.baseUrlFor('qijieya');
+    if (base == null) return null;
+    final url = '$base?server=$server&type=search&id=$query&limit=1';
 
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     try {

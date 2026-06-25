@@ -1,16 +1,15 @@
 import 'package:dio/dio.dart';
 import '../models/song.dart';
 
-/// 冰豆音乐搜索 API — music.bingdou.xyz
-/// 搜索返回直接 mp3 URL 和内联歌词，无需二次请求
 class BingdouProvider {
   final Dio _dio;
+  final String _base;
+  final String _origin;
 
-  static const _base = 'https://music.bingdou.xyz/';
+  BingdouProvider(this._dio, {required String baseUrl})
+      : _base = baseUrl,
+        _origin = Uri.parse(baseUrl).origin;
 
-  BingdouProvider(this._dio);
-
-  /// 搜索
   Future<List<Song>> search(String keyword, {String musicType = 'netease', int page = 1}) async {
     try {
       final resp = await _dio.post(
@@ -25,8 +24,8 @@ class BingdouProvider {
           contentType: Headers.formUrlEncodedContentType,
           headers: {
             'x-requested-with': 'XMLHttpRequest',
-            'origin': 'https://music.bingdou.xyz',
-            'referer': 'https://music.bingdou.xyz/',
+            'origin': _origin,
+            'referer': _base,
           },
         ),
       );
@@ -54,7 +53,6 @@ class BingdouProvider {
     }
   }
 
-  /// 将 HTTP 图片链接升级为 HTTPS，避免 Android/iOS 网络限制导致封图无法加载
   static String? _upgradeToHttps(String? url) {
     if (url == null || url.isEmpty) return url;
     if (url.startsWith('http://')) {
@@ -63,7 +61,6 @@ class BingdouProvider {
     return url;
   }
 
-  /// 获取播放链接 — 搜索结果中已包含直链，直接从 extra 取
   Future<SongUrl?> getUrl(Song song) async {
     final url = song.extra?['url']?.toString();
     final lrc = song.extra?['lrc']?.toString();

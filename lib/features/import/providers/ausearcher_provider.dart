@@ -1,16 +1,15 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import '../models/song.dart';
 
-/// Ausearcher 音乐搜索 API — ausearcher.com/music/
-/// 搜索返回直接 mp3 URL 和内联歌词，无需二次请求
 class AusearcherProvider {
   final Dio _dio;
+  final String _base;
+  final String _origin;
 
-  static const _base = 'https://ausearcher.com/music/';
+  AusearcherProvider(this._dio, {required String baseUrl})
+      : _base = baseUrl,
+        _origin = Uri.parse(baseUrl).origin;
 
-  AusearcherProvider(this._dio);
-
-  /// 搜索
   Future<List<Song>> search(String keyword, {String musicType = 'netease', int page = 1}) async {
     try {
       final resp = await _dio.post(
@@ -25,8 +24,8 @@ class AusearcherProvider {
           contentType: Headers.formUrlEncodedContentType,
           headers: {
             'x-requested-with': 'XMLHttpRequest',
-            'origin': 'https://ausearcher.com',
-            'referer': 'https://ausearcher.com/music/',
+            'origin': _origin,
+            'referer': _base,
           },
         ),
       );
@@ -54,7 +53,6 @@ class AusearcherProvider {
     }
   }
 
-  /// 获取播放链接 — 搜索结果中已包含直链，直接从 extra 取
   Future<SongUrl?> getUrl(Song song) async {
     final url = song.extra?['url']?.toString();
     final lrc = song.extra?['lrc']?.toString();

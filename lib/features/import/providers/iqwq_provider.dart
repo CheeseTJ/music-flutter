@@ -1,16 +1,15 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import '../models/song.dart';
 
-/// iqwq 音乐搜索 API — music.iqwq.cn
-/// 搜索返回直接 mp3 URL 和内联歌词，无需二次请求
 class IqwqProvider {
   final Dio _dio;
+  final String _base;
+  final String _origin;
 
-  static const _base = 'https://music.iqwq.cn/';
+  IqwqProvider(this._dio, {required String baseUrl})
+      : _base = baseUrl,
+        _origin = Uri.parse(baseUrl).origin;
 
-  IqwqProvider(this._dio);
-
-  /// 搜索
   Future<List<Song>> search(String keyword, {String musicType = 'netease', int page = 1}) async {
     try {
       final resp = await _dio.post(
@@ -25,8 +24,8 @@ class IqwqProvider {
           contentType: Headers.formUrlEncodedContentType,
           headers: {
             'x-requested-with': 'XMLHttpRequest',
-            'origin': 'https://music.iqwq.cn',
-            'referer': 'https://music.iqwq.cn/',
+            'origin': _origin,
+            'referer': _base,
           },
         ),
       );
@@ -54,7 +53,6 @@ class IqwqProvider {
     }
   }
 
-  /// 获取播放链接 — 搜索结果中已包含直链，直接从 extra 取
   Future<SongUrl?> getUrl(Song song) async {
     final url = song.extra?['url']?.toString();
     final lrc = song.extra?['lrc']?.toString();
