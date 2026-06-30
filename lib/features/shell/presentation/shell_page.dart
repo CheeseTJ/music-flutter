@@ -21,6 +21,8 @@ class _ShellPageState extends ConsumerState<ShellPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // 同时订阅 state 变化，否则只 watch notifier 不会在 _currentSong 改变时 rebuild
+    ref.watch(playerProvider);
     final hasSong = ref.watch(playerProvider.notifier).currentSong != null;
     final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final showUploadButton = ref.watch(showUploadButtonProvider);

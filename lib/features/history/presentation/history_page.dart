@@ -114,19 +114,7 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
                       key: ValueKey('history_${r.songId}_${r.playedAt}'),
                       song: _toSong(r),
                       onTap: () {
-                        context.push('/player', extra: {
-                          'id': r.songId,
-                          'title': r.title,
-                          'artist': r.artist,
-                          'album': '',
-                          'format': r.format,
-                          'duration': r.duration,
-                          'size': r.size,
-                          'lyric_path': null,
-                          'created_at': r.playedAt,
-                          'lastPosition': r.positionSeconds,
-                          'fromHistory': true,
-                        });
+                        context.push('/player', extra: _toSong(r));
                       },
                     );
                   },

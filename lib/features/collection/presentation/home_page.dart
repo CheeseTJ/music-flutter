@@ -97,19 +97,31 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   void _restoreOnce(WidgetRef ref) {
     if (_restored) return;
     _restored = true;
-    final songs = ref.read(songListProvider).valueOrNull;
-    if (songs == null || songs.isEmpty) return;
     PlaybackHistory().all.then((records) {
       if (!mounted || records.isEmpty) return;
       final last = records.first;
-      final song = songs.cast<Song?>().firstWhere(
-        (s) => s?.id == last.songId,
-        orElse: () => null,
-      );
-      if (song == null) return;
       final notifier = ref.read(playerProvider.notifier);
       if (notifier.currentSong != null) return;
-      notifier.setPlaylist(songs);
+
+      // 直接从历史记录构造 Song 恢复，不等 songListProvider 加载完成
+      final song = Song(
+        id: last.songId,
+        title: last.title,
+        artist: last.artist,
+        album: '',
+        format: last.format,
+        duration: last.duration,
+        size: last.size,
+        type: '',
+        createdAt: last.playedAt,
+      );
+
+      // 若本地曲库已就绪，顺便设置 playlist 供 next/previous 使用
+      final songs = ref.read(songListProvider).valueOrNull;
+      if (songs != null && songs.isNotEmpty) {
+        notifier.setPlaylist(songs);
+      }
+
       notifier.load(song);
     });
   }

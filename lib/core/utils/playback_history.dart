@@ -99,28 +99,6 @@ class PlaybackHistory {
     await _save();
   }
 
-  Future<void> updatePosition(int songId, int positionSeconds) async {
-    await _ensureLoaded();
-    final idx = _records.indexWhere((r) => r.songId == songId);
-    if (idx < 0) return;
-    _records[idx] = PlayRecord(
-      songId: _records[idx].songId,
-      title: _records[idx].title,
-      artist: _records[idx].artist,
-      format: _records[idx].format,
-      duration: _records[idx].duration,
-      positionSeconds: positionSeconds,
-      size: _records[idx].size,
-      playedAt: DateTime.now().millisecondsSinceEpoch,
-    );
-    await _save();
-  }
-
-  Future<PlayRecord?> get lastPlayed async {
-    await _ensureLoaded();
-    return _records.isNotEmpty ? _records.first : null;
-  }
-
   Future<List<PlayRecord>> get all async {
     await _ensureLoaded();
     return List.unmodifiable(_records);

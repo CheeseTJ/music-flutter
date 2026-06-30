@@ -358,6 +358,11 @@ class PlayerController extends StateNotifier<PlayerState> {
       await _handler.play();
       state = state.copyWith(phase: PlayerPhase.playing);
       _syncCustomNotification(null);
+      // 在线播放也写入历史，保证最新一条可被冷启动恢复
+      final songId = int.tryParse(id ?? '') ?? 0;
+      if (songId != 0) {
+        await PlaybackHistory().record(songId, title, artist, '', 0, 0, 0);
+      }
       _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
       _durationSub = _handler.player.durationStream.listen((_) {});
       _playingSub = _handler.player.playingStream.listen((playing) {
@@ -428,7 +433,9 @@ class PlayerController extends StateNotifier<PlayerState> {
 
 final playerProvider = StateNotifierProvider<PlayerController, PlayerState>((ref) {
   final api = ref.read(apiClientProvider);
-  final handler = ref.watch(audioHandlerProvider);
+  // 用 read 而非 watch：避免 audioHandlerProvider 变化时重建整个 controller
+  // （否则 initAudioService 完成后会丢弃已恢复的 _currentSong）
+  final handler = ref.read(audioHandlerProvider);
   final controller = PlayerController(api, handler);
 
   ref.listen(audioHandlerProvider, (_, next) {

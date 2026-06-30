@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
 import '../../../core/utils/settings.dart';
@@ -58,6 +59,12 @@ class _VaultPageState extends ConsumerState<VaultPage> {
               totalSongs: totalSongs,
               totalLyrics: totalLyrics,
               isDark: isDark,
+            ),
+            const SizedBox(height: 28),
+
+            _HistoryEntry(
+              isDark: isDark,
+              onTap: () => context.push('/history'),
             ),
             const SizedBox(height: 28),
 
@@ -238,6 +245,46 @@ class _Divider extends StatelessWidget {
     return Container(
       width: 1, height: 36,
       color: PearlColors.bgTertiary(isDark),
+    );
+  }
+}
+
+// ============================================================
+//  History entry: jump to play history page
+// ============================================================
+class _HistoryEntry extends StatelessWidget {
+  final bool isDark;
+  final VoidCallback onTap;
+  const _HistoryEntry({required this.isDark, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: PearlColors.glassBgStrong(isDark),
+          borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.history, size: 20, color: PearlColors.accent(isDark)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text('Play History',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: PearlColors.textPrimary(isDark),
+                  )),
+            ),
+            Icon(Icons.chevron_right,
+                size: 20, color: PearlColors.textSecondary(isDark)),
+          ],
+        ),
+      ),
     );
   }
 }

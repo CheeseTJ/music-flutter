@@ -8,6 +8,7 @@ import '../../features/player/presentation/lyrics_page.dart';
 import '../../features/import/presentation/search_page.dart';
 import '../../features/vault/presentation/profile_page.dart';
 import '../../features/shell/presentation/shell_page.dart';
+import '../../features/history/presentation/history_page.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -105,6 +106,33 @@ GoRouter buildRouter() {
           return CustomTransitionPage(
             key: state.pageKey,
             child: InternetSearchPage(initialQuery: initialQuery),
+            transitionDuration: PearlMotion.durationPage,
+            reverseTransitionDuration: PearlMotion.durationPage,
+            barrierColor: Colors.transparent,
+            transitionsBuilder: (_, animation, __, child) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(1, 0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: PearlMotion.standard,
+                  reverseCurve: PearlMotion.standardIn,
+                )),
+                child: child,
+              );
+            },
+          );
+        },
+      ),
+      // Play History (slides from right)
+      GoRoute(
+        path: '/history',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (context, state) {
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const PlayHistoryPage(),
             transitionDuration: PearlMotion.durationPage,
             reverseTransitionDuration: PearlMotion.durationPage,
             barrierColor: Colors.transparent,
