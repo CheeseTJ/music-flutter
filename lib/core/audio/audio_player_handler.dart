@@ -19,6 +19,7 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void Function()? onSkipToNext;
   void Function()? onSkipToPrevious;
+  void Function()? onStop;
 
   MusicAudioHandler() {
     debugPrint('[AudioHandler] Created');
@@ -26,6 +27,7 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
     _positionSub = _player.positionStream.listen((pos) {
       _positionController.add(pos);
+      _broadcastPosition(pos);
     });
 
     _durationSub = _player.durationStream.listen((dur) {
@@ -39,6 +41,23 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
     _playingSub = _player.playingStream.listen((playing) {
       _isPlaying = playing;
+    });
+  }
+
+  Timer? _positionTimer;
+  // 周期更新 PlaybackState 的 position，让锁屏/通知进度条实时移动
+  void _broadcastPosition(Duration pos) {
+    if (_positionTimer?.isActive ?? false) return;
+    _positionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_isPlaying) {
+        _positionTimer?.cancel();
+        _positionTimer = null;
+        return;
+      }
+      playbackState.add(playbackState.value.copyWith(
+        updatePosition: _player.position,
+        bufferedPosition: _player.bufferedPosition,
+      ));
     });
   }
 
@@ -56,11 +75,14 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaControl.skipToPrevious,
         if (playing) MediaControl.pause else MediaControl.play,
         MediaControl.skipToNext,
+        MediaControl.stop,
       ],
       systemActions: const {
         MediaAction.skipToPrevious,
         MediaAction.playPause,
         MediaAction.skipToNext,
+        MediaAction.seek,
+        MediaAction.stop,
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: const {
@@ -76,6 +98,10 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
       speed: _player.speed,
     ));
   }
+
+  /// 媒体按键（耳机线控/蓝牙按键）由 Android MediaButtonReceiver 自动转成
+  /// MediaSession transport controls 调用，最终走到 play()/pause()/
+  /// skipToNext()/skipToPrevious()。无需在 Dart 端手动处理 KeyEvent。
 
   Future<void> loadSong({
     required String url,
@@ -114,8 +140,12 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> stop() async {
     debugPrint('[AudioHandler] stop');
+    _positionTimer?.cancel();
+    _positionTimer = null;
     await _player.stop();
     _isPlaying = false;
+    // 通知 PlayerController 清空 currentSong，让 mini player 消失
+    onStop?.call();
     return super.stop();
   }
 
@@ -137,6 +167,7 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> close() async {
+    _positionTimer?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
@@ -151,26 +182,34 @@ final audioHandlerProvider = StateProvider<MusicAudioHandler>((ref) {
 });
 
 Future<void> initAudioService(StateController<MusicAudioHandler> controller) async {
-  try {
-    debugPrint('[AudioService] init start');
-    final info = await NotificationService.debugInfo();
-    debugPrint('[AudioService] device info:\n$info');
+  debugPrint('[AudioService] init start');
+  final info = await NotificationService.debugInfo();
+  debugPrint('[AudioService] device info:\n$info');
 
-    final handler = await AudioService.init(
-      builder: () => MusicAudioHandler(),
-      config: AudioServiceConfig(
-        androidNotificationChannelId: 'com.example.music_app.channel.audio',
-        androidNotificationChannelName: '\u97f3\u4e50\u64ad\u653e',
-        androidNotificationIcon: 'drawable/ic_stat_music_note',
-        androidNotificationClickStartsActivity: true,
-        androidStopForegroundOnPause: false,
-      ),
-    ).timeout(const Duration(seconds: 15));
-    controller.state = handler;
-    debugPrint('[AudioService] init success');
-  } catch (e, stack) {
-    debugPrint('[AudioService] init FAILED: $e');
-    debugPrint('[AudioService] stack: $stack');
-    CustomNotificationService.enable();
+  // 重试 3 次，确保 audio_service 始终可用（避免 fallback 到自定义通知导致蓝牙按键失效）
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    try {
+      final handler = await AudioService.init(
+        builder: () => MusicAudioHandler(),
+        config: AudioServiceConfig(
+          androidNotificationChannelId: 'com.example.music_app.channel.audio',
+          androidNotificationChannelName: '\u97f3\u4e50\u64ad\u653e',
+          androidNotificationIcon: 'drawable/ic_stat_music_note',
+          androidNotificationClickStartsActivity: true,
+          androidStopForegroundOnPause: false,
+        ),
+      ).timeout(const Duration(seconds: 15));
+      controller.state = handler;
+      debugPrint('[AudioService] init success (attempt $attempt)');
+      return;
+    } catch (e, stack) {
+      debugPrint('[AudioService] init attempt $attempt FAILED: $e');
+      debugPrint('[AudioService] stack: $stack');
+      if (attempt < 3) {
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
   }
+  debugPrint('[AudioService] init failed after 3 attempts, falling back to custom notification');
+  CustomNotificationService.enable();
 }

@@ -96,6 +96,13 @@ class PlayerController extends StateNotifier<PlayerState> {
     _handler.onSkipToPrevious = () {
       if (_playlist.isNotEmpty) previous();
     };
+    _handler.onStop = () {
+      _handler.pause();
+      _currentSong = null;
+      _playlist = [];
+      _currentIndex = -1;
+      state = PlayerState.idle();
+    };
   }
 
   StreamSubscription<String>? _customNotifSub;
