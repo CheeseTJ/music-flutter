@@ -12,6 +12,7 @@ class Settings {
 
   static const _kShowUploadButton = 'show_upload_button';
   static const _kShowMiniPlayer = 'show_mini_player';
+  static const _kPlayMode = 'play_mode';
 
   /// 是否显示底栏的"上传"快捷按钮。默认 true。
   static Future<bool> getShowUploadButton() async {
@@ -33,6 +34,16 @@ class Settings {
   static Future<void> setShowMiniPlayer(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kShowMiniPlayer, value);
+  }
+
+  static Future<int> getPlayMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_kPlayMode) ?? 0;
+  }
+
+  static Future<void> setPlayMode(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kPlayMode, value);
   }
 }
 

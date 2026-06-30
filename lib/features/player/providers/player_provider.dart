@@ -8,6 +8,8 @@ import 'package:just_audio/just_audio.dart';
 import '../../../data/models/song.dart';
 import '../../../core/audio/audio_player_handler.dart';
 import '../../../core/audio/custom_notification_service.dart';
+import '../../../core/utils/playback_history.dart';
+import '../../../core/utils/settings.dart';
 import '../../../data/models/lrc_parser.dart';
 import '../../../data/datasources/remote/api_client.dart';
 import '../../../core/network/platform_cover_service.dart';
@@ -72,6 +74,13 @@ class PlayerController extends StateNotifier<PlayerState> {
   PlayerController(this._apiClient, this._handler) : super(PlayerState.idle()) {
     _wireHandlerCallbacks();
     _wireCustomNotificationActions();
+    _restorePlayMode();
+  }
+
+  void _restorePlayMode() {
+    Settings.getPlayMode().then((mode) {
+      state = state.copyWith(playMode: mode);
+    });
   }
 
   void setHandler(MusicAudioHandler handler) {
@@ -95,12 +104,12 @@ class PlayerController extends StateNotifier<PlayerState> {
       switch (action) {
         case 'play':
           _handler.play();
-          state = PlayerState.playing();
+          state = state.copyWith(phase: PlayerPhase.playing);
           CustomNotificationService.updatePlayState(true);
           break;
         case 'pause':
           _handler.pause();
-          state = PlayerState.paused();
+          state = state.copyWith(phase: PlayerPhase.paused);
           CustomNotificationService.updatePlayState(false);
           break;
         case 'skipNext':
@@ -129,7 +138,33 @@ class PlayerController extends StateNotifier<PlayerState> {
     _playlist = songs;
   }
 
+  Future<void> load(Song song) async {
+    try {
+      await _loadSongInternal(song);
+      state = state.copyWith(phase: PlayerPhase.paused);
+      _wirePlayerStreams();
+      _fetchLyric(song.id);
+    } catch (e) {
+      state = state.copyWith(phase: PlayerPhase.error);
+    }
+  }
+
   Future<void> play(Song song) async {
+    try {
+      await _loadSongInternal(song);
+      await _handler.play();
+      state = state.copyWith(phase: PlayerPhase.playing);
+      _syncCustomNotification(_lastCoverUrl ?? _fallbackArtUri?.toString());
+      _wirePlayerStreams();
+      _fetchLyric(song.id);
+    } catch (e) {
+      state = state.copyWith(phase: PlayerPhase.error);
+    }
+  }
+
+  String? _lastCoverUrl;
+
+  Future<void> _loadSongInternal(Song song) async {
     final index = _playlist.indexWhere((s) => s.id == song.id);
     if (index >= 0) _currentIndex = index;
 
@@ -137,48 +172,44 @@ class PlayerController extends StateNotifier<PlayerState> {
     _lyric = null;
     _currentLyricIndex = -1;
     _playingUrlId = null;
-    state = PlayerState.loading();
+    state = state.copyWith(phase: PlayerPhase.loading);
 
-    try {
-      final data = await _apiClient.getPlayUrl(song.id);
-      final url = data['url'] as String;
+    final data = await _apiClient.getPlayUrl(song.id);
+    final url = data['url'] as String;
 
-      final coverUrl = await const PlatformCoverService().fetchUrl(song.type, song.title, song.artist);
-      final artUri = coverUrl != null ? Uri.parse(coverUrl) : await _getFallbackArtUri();
+    _lastCoverUrl = await const PlatformCoverService().fetchUrl(song.type, song.title, song.artist);
+    final cover = _lastCoverUrl;
+    final artUri = cover != null ? Uri.parse(cover) : await _getFallbackArtUri();
 
-      await _handler.loadSong(
-        url: url,
-        id: song.id.toString(),
-        title: song.title,
-        artist: song.artist,
-        album: song.album,
-        artUri: artUri,
-      );
-      await _handler.play();
-      state = PlayerState.playing();
-      _syncCustomNotification(coverUrl ?? _fallbackArtUri?.toString());
+    await _handler.loadSong(
+      url: url,
+      id: song.id.toString(),
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      artUri: artUri,
+    );
 
-      _positionSub?.cancel();
-      _durationSub?.cancel();
-      _completeSub?.cancel();
-      _playingSub?.cancel();
-      _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
-      _durationSub = _handler.player.durationStream.listen((_) {});
-      _playingSub = _handler.player.playingStream.listen((playing) {
-        if (!playing && state.isPlaying) {
-          state = PlayerState.paused();
-        }
-      });
-      _completeSub = _handler.player.playerStateStream.listen((ps) {
-        if (ps.processingState == ProcessingState.completed) {
-          onSongEnd();
-        }
-      });
+    PlaybackHistory().record(song.id, song.title, song.artist, song.format, song.duration, 0, song.size);
+  }
 
-      _fetchLyric(song.id);
-    } catch (e) {
-      state = PlayerState.error();
-    }
+  void _wirePlayerStreams() {
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _completeSub?.cancel();
+    _playingSub?.cancel();
+    _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
+    _durationSub = _handler.player.durationStream.listen((_) {});
+    _playingSub = _handler.player.playingStream.listen((playing) {
+      if (!playing && state.isPlaying) {
+        state = state.copyWith(phase: PlayerPhase.paused);
+      }
+    });
+    _completeSub = _handler.player.playerStateStream.listen((ps) {
+      if (ps.processingState == ProcessingState.completed) {
+        onSongEnd();
+      }
+    });
   }
 
   void _onPositionChanged(Duration position) {
@@ -241,15 +272,17 @@ class PlayerController extends StateNotifier<PlayerState> {
     if (state.playMode == 1) {
       _handler.seek(Duration.zero);
       _handler.play();
-      state = PlayerState.playing();
+      state = state.copyWith(phase: PlayerPhase.playing);
     } else {
-      state = PlayerState.paused();
+      state = state.copyWith(phase: PlayerPhase.paused);
       next();
     }
   }
 
   Future<void> next() async {
     if (_playlist.isEmpty) return;
+    await _handler.stop();
+    state = state.copyWith(phase: PlayerPhase.paused);
     if (state.playMode == 2) {
       if (_playlist.length == 1) {
         await play(_playlist[0]);
@@ -275,6 +308,8 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   Future<void> previous() async {
     if (_playlist.isEmpty) return;
+    await _handler.stop();
+    state = state.copyWith(phase: PlayerPhase.paused);
     if (state.playMode == 2) {
       final rng = Random();
       var prevIdx = _currentIndex;
@@ -296,7 +331,7 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   Future<void> playUrl(String url, String title, String artist, {String? platform, String? id, String? lyric}) async {
     try {
-      state = PlayerState.loading();
+      state = state.copyWith(phase: PlayerPhase.loading);
       _currentSong = Song(id: 0, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
       _lyric = (lyric != null && lyric.isNotEmpty) ? LrcParser.parse(lyric) : null;
       _currentLyricIndex = -1;
@@ -310,13 +345,13 @@ class PlayerController extends StateNotifier<PlayerState> {
         artUri: await _getFallbackArtUri(),
       );
       await _handler.play();
-      state = PlayerState.playing();
+      state = state.copyWith(phase: PlayerPhase.playing);
       _syncCustomNotification(null);
       _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
       _durationSub = _handler.player.durationStream.listen((_) {});
       _playingSub = _handler.player.playingStream.listen((playing) {
         if (!playing && state.isPlaying) {
-          state = PlayerState.paused();
+          state = state.copyWith(phase: PlayerPhase.paused);
         }
       });
       _completeSub = _handler.player.playerStateStream.listen((ps) {
@@ -325,18 +360,18 @@ class PlayerController extends StateNotifier<PlayerState> {
         }
       });
     } catch (e) {
-      state = PlayerState.error();
+      state = state.copyWith(phase: PlayerPhase.error);
     }
   }
 
   void togglePlayPause() {
     if (_handler.playing) {
       _handler.pause();
-      state = PlayerState.paused();
+      state = state.copyWith(phase: PlayerPhase.paused);
       CustomNotificationService.updatePlayState(false);
     } else {
       _handler.play();
-      state = PlayerState.playing();
+      state = state.copyWith(phase: PlayerPhase.playing);
       CustomNotificationService.updatePlayState(true);
     }
   }
@@ -365,6 +400,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   void togglePlayMode() {
     final newMode = (state.playMode + 1) % 3;
     state = state.copyWith(playMode: newMode);
+    Settings.setPlayMode(newMode);
   }
 
   @override

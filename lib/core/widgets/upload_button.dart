@@ -4,15 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/pearl_colors.dart';
 import '../theme/pearl_theme.dart';
-import '../../core/crypto/kgm_decoder.dart';
+import '../../core/crypto/kgm.dart';
 import '../../data/datasources/remote/api_client.dart';
 import '../../features/collection/providers/song_list_provider.dart';
 
-/// 上传按钮：底栏的"快速上传"圆形按钮，点击后直接调起文件选择器，
-/// 选完文件立即走和原 Import 页相同的解密+上传流程。
-///
-/// 是否显示由 [Settings.showUploadButton] 控制；该值变更时，调用方需
-/// 自行重建（一般在 ShellPage 用一个 FutureBuilder / ValueNotifier 监听）。
 class UploadButton extends ConsumerWidget {
   final bool isDark;
   const UploadButton({super.key, required this.isDark});
@@ -74,12 +69,12 @@ class UploadButton extends ConsumerWidget {
         String uploadPath = file.path!;
         String uploadName = file.name;
 
-        if (KgmDecoder.isKgmFile(file.name)) {
-          final outName = KgmDecoder.stripKgmExtension(file.name);
-          final outDir = '${Directory.systemTemp.path}/kgm_decoded';
+        if (KgmProcessor.isAcceptedFile(file.name)) {
+          final outName = KgmProcessor.stripExtension(file.name);
+          final outDir = '${Directory.systemTemp.path}/processed';
           await Directory(outDir).create(recursive: true);
           final outPath = '$outDir/$outName';
-          uploadPath = await KgmDecoder.decode(file.path!, outputPath: outPath);
+          uploadPath = await KgmProcessor.process(file.path!, outputPath: outPath);
           uploadName = uploadPath.split(Platform.pathSeparator).last;
         }
 
@@ -110,8 +105,6 @@ class UploadButton extends ConsumerWidget {
   }
 }
 
-/// 与原 Import 页同款的卡片样式，留在本文件以备扩展（例如以后想要
-/// "上传到云"等高级选项，可以挂在底栏按钮的长按菜单里）。
 class ImportCard extends StatelessWidget {
   final IconData icon;
   final String title;

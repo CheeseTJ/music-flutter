@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
+import '../../../core/utils/playback_history.dart';
 import '../../../core/utils/settings.dart';
 import '../../../core/widgets/pearl_bottom_sheet.dart';
 import '../../../data/models/song.dart';
@@ -28,6 +29,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   FilterOption _filter = FilterOption.all;
   String _greetingText = '';
   Timer? _greetingTimer;
+  bool _restored = false;
 
   @override
   void initState() {
@@ -76,11 +78,40 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     });
   }
 
+  void _scheduleRestore(WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreOnce(ref);
+    });
+  }
+
   Future<void> _doRefresh(WidgetRef ref) async {
     if (_refreshing) return;
     setState(() => _refreshing = true);
     await ref.read(songListProvider.notifier).load();
-    if (mounted) setState(() => _refreshing = false);
+    if (mounted) {
+      setState(() => _refreshing = false);
+      _restoreOnce(ref);
+    }
+  }
+
+  void _restoreOnce(WidgetRef ref) {
+    if (_restored) return;
+    _restored = true;
+    final songs = ref.read(songListProvider).valueOrNull;
+    if (songs == null || songs.isEmpty) return;
+    PlaybackHistory().all.then((records) {
+      if (!mounted || records.isEmpty) return;
+      final last = records.first;
+      final song = songs.cast<Song?>().firstWhere(
+        (s) => s?.id == last.songId,
+        orElse: () => null,
+      );
+      if (song == null) return;
+      final notifier = ref.read(playerProvider.notifier);
+      if (notifier.currentSong != null) return;
+      notifier.setPlaylist(songs);
+      notifier.load(song);
+    });
   }
 
   List<Song> _applyFilter(List<Song> songs) {
@@ -136,6 +167,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     final hasSong = currentSong != null;
     final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    _scheduleRestore(ref);
 
     // Tab bar: 64 height + 16 bottom padding + safe area
     // Mini player: 68 height + 8 gap (only when song exists and setting is on)
