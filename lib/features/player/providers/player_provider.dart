@@ -54,6 +54,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<dynamic>? _completeSub;
   StreamSubscription<bool>? _playingSub;
+  bool _isSkipping = false;
 
   static String get _lyricCacheDir => '${Directory.systemTemp.path}/lyric_cache';
 
@@ -280,52 +281,62 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   Future<void> next() async {
-    if (_playlist.isEmpty) return;
-    await _handler.stop();
-    state = state.copyWith(phase: PlayerPhase.paused);
-    if (state.playMode == 2) {
-      if (_playlist.length == 1) {
-        await play(_playlist[0]);
+    if (_playlist.isEmpty || _isSkipping) return;
+    _isSkipping = true;
+    try {
+      await _handler.stop();
+      state = state.copyWith(phase: PlayerPhase.paused);
+      if (state.playMode == 2) {
+        if (_playlist.length == 1) {
+          await play(_playlist[0]);
+          return;
+        }
+        final rng = Random();
+        var nextIdx = _currentIndex;
+        while (nextIdx == _currentIndex) {
+          nextIdx = rng.nextInt(_playlist.length);
+        }
+        _currentIndex = nextIdx;
+        await play(_playlist[_currentIndex]);
         return;
       }
-      final rng = Random();
-      var nextIdx = _currentIndex;
-      while (nextIdx == _currentIndex) {
-        nextIdx = rng.nextInt(_playlist.length);
+      if (_currentIndex < _playlist.length - 1) {
+        _currentIndex++;
+        await play(_playlist[_currentIndex]);
+      } else if (state.playMode == 0) {
+        _currentIndex = 0;
+        await play(_playlist[_currentIndex]);
       }
-      _currentIndex = nextIdx;
-      await play(_playlist[_currentIndex]);
-      return;
-    }
-    if (_currentIndex < _playlist.length - 1) {
-      _currentIndex++;
-      await play(_playlist[_currentIndex]);
-    } else if (state.playMode == 0) {
-      _currentIndex = 0;
-      await play(_playlist[_currentIndex]);
+    } finally {
+      _isSkipping = false;
     }
   }
 
   Future<void> previous() async {
-    if (_playlist.isEmpty) return;
-    await _handler.stop();
-    state = state.copyWith(phase: PlayerPhase.paused);
-    if (state.playMode == 2) {
-      final rng = Random();
-      var prevIdx = _currentIndex;
-      while (prevIdx == _currentIndex) {
-        prevIdx = rng.nextInt(_playlist.length);
+    if (_playlist.isEmpty || _isSkipping) return;
+    _isSkipping = true;
+    try {
+      await _handler.stop();
+      state = state.copyWith(phase: PlayerPhase.paused);
+      if (state.playMode == 2) {
+        final rng = Random();
+        var prevIdx = _currentIndex;
+        while (prevIdx == _currentIndex) {
+          prevIdx = rng.nextInt(_playlist.length);
+        }
+        _currentIndex = prevIdx;
+        await play(_playlist[_currentIndex]);
+        return;
       }
-      _currentIndex = prevIdx;
-      await play(_playlist[_currentIndex]);
-      return;
-    }
-    if (_currentIndex > 0) {
-      _currentIndex--;
-      await play(_playlist[_currentIndex]);
-    } else if (state.playMode == 0) {
-      _currentIndex = _playlist.length - 1;
-      await play(_playlist[_currentIndex]);
+      if (_currentIndex > 0) {
+        _currentIndex--;
+        await play(_playlist[_currentIndex]);
+      } else if (state.playMode == 0) {
+        _currentIndex = _playlist.length - 1;
+        await play(_playlist[_currentIndex]);
+      }
+    } finally {
+      _isSkipping = false;
     }
   }
 
