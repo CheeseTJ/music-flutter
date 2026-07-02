@@ -19,7 +19,6 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void Function()? onSkipToNext;
   void Function()? onSkipToPrevious;
-  void Function()? onStop;
 
   MusicAudioHandler() {
     debugPrint('[AudioHandler] Created');
@@ -144,8 +143,6 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     _positionTimer = null;
     await _player.stop();
     _isPlaying = false;
-    // 通知 PlayerController 清空 currentSong，让 mini player 消失
-    onStop?.call();
     return super.stop();
   }
 

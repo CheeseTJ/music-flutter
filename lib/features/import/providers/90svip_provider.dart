@@ -72,8 +72,6 @@ class Netease90SvipProvider {
     return SongUrl(url: urlPath, lrc: lrc, source: 'net90svip', ext: ext);
   }
 
-  Future<String?> fetchLrc(Song song) => _fetchLrc(song);
-
   Future<String?> _fetchLrc(Song song) async {
     final lrcUrl = song.extra?['lrc_url']?.toString();
     if (lrcUrl == null || lrcUrl.isEmpty) return null;

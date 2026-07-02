@@ -41,3 +41,25 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/build/
+
+# Wrangler (Cloudflare Workers, not used)
+.wrangler/
+
+# Signing
+/android/key.properties
+/android/app/upload-keystore.jks
+
+# Root-level temp/dev files
+nul
+api.txt
+screenshot.png
+flutter_error.log
+flutter_output.log
+cert_info.txt
+
+# Node (Cloudflare Workers tooling, not part of app)
+node_modules/
+
+# TRAE IDE internal
+.trae/

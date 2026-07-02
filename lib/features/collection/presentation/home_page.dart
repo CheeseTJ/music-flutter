@@ -174,6 +174,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   @override
   Widget build(BuildContext context) {
     final songsAsync = ref.watch(songListProvider);
+    final songs = songsAsync.valueOrNull;
+    final filtered = songs != null ? _applyFilter(songs) : const <Song>[];
     final playerState = ref.watch(playerProvider);
     final currentSong = ref.watch(playerProvider.notifier).currentSong;
     final hasSong = currentSong != null;
@@ -290,7 +292,6 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
           data: (songs) {
-            final filtered = _applyFilter(songs);
             if (filtered.isEmpty) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
@@ -341,7 +342,6 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             ),
             error: (e, _) => _ErrorView(isDark: isDark, onRetry: () => ref.read(songListProvider.notifier).load()),
             data: (songs) {
-              final filtered = _applyFilter(songs);
               if (filtered.isEmpty) {
                 return _EmptyView(isDark: isDark);
               }

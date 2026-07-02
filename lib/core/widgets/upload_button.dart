@@ -3,7 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/pearl_colors.dart';
-import '../theme/pearl_theme.dart';
 import '../../core/crypto/kgm.dart';
 import '../../data/datasources/remote/api_client.dart';
 import '../../features/collection/providers/song_list_provider.dart';
@@ -102,83 +101,5 @@ class UploadButton extends ConsumerWidget {
         ),
       );
     }
-  }
-}
-
-class ImportCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool isDark;
-  final VoidCallback onTap;
-  const ImportCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = PearlColors.accent(isDark);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-        child: Container(
-          width: double.infinity,
-          height: 160,
-          decoration: BoxDecoration(
-            color: PearlColors.bgTertiary(isDark),
-            borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        accent.withValues(alpha: 0.08),
-                        accent.withValues(alpha: 0.02),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, color: accent, size: 36),
-                    const SizedBox(height: 14),
-                    Text(title,
-                        style: TextStyle(
-                          color: PearlColors.textPrimary(isDark),
-                          fontSize: 20, fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                        )),
-                    const SizedBox(height: 4),
-                    Text(subtitle,
-                        style: TextStyle(
-                          color: PearlColors.textSecondary(isDark),
-                          fontSize: 14,
-                        )),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

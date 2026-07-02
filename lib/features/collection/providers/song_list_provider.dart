@@ -71,25 +71,6 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
       state = AsyncData(updated);
     });
   }
-
-  Future<void> removeLyric(int id) async {
-    await _api.deleteLyric(id);
-    state.whenData((songs) {
-      final updated = songs.map((s) {
-        if (s.id == id) {
-          return Song(
-            id: s.id, title: s.title, artist: s.artist,
-            album: s.album, format: s.format,
-            duration: s.duration, size: s.size,
-            lyricPath: null, createdAt: s.createdAt,
-          );
-        }
-        return s;
-      }).toList();
-      _saveCache(updated);
-      state = AsyncData(updated);
-    });
-  }
 }
 
 final songListProvider =

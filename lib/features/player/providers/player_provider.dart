@@ -55,6 +55,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   StreamSubscription<dynamic>? _completeSub;
   StreamSubscription<bool>? _playingSub;
   bool _isSkipping = false;
+  final _random = Random();
 
   static String get _lyricCacheDir => '${Directory.systemTemp.path}/lyric_cache';
 
@@ -95,13 +96,6 @@ class PlayerController extends StateNotifier<PlayerState> {
     };
     _handler.onSkipToPrevious = () {
       if (_playlist.isNotEmpty) previous();
-    };
-    _handler.onStop = () {
-      _handler.pause();
-      _currentSong = null;
-      _playlist = [];
-      _currentIndex = -1;
-      state = PlayerState.idle();
     };
   }
 
@@ -277,6 +271,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   void onSongEnd() {
+    debugPrint('[onSongEnd] playMode=${state.playMode} playlist=${_playlist.length} idx=$_currentIndex isSkipping=$_isSkipping');
     if (state.playMode == 1) {
       _handler.seek(Duration.zero);
       _handler.play();
@@ -285,6 +280,15 @@ class PlayerController extends StateNotifier<PlayerState> {
       state = state.copyWith(phase: PlayerPhase.paused);
       next();
     }
+  }
+
+  int _randomIndex() {
+    if (_playlist.length == 1) return 0;
+    var idx = _currentIndex;
+    while (idx == _currentIndex) {
+      idx = _random.nextInt(_playlist.length);
+    }
+    return idx;
   }
 
   Future<void> next() async {
@@ -298,21 +302,20 @@ class PlayerController extends StateNotifier<PlayerState> {
           await play(_playlist[0]);
           return;
         }
-        final rng = Random();
-        var nextIdx = _currentIndex;
-        while (nextIdx == _currentIndex) {
-          nextIdx = rng.nextInt(_playlist.length);
-        }
-        _currentIndex = nextIdx;
+        _currentIndex = _randomIndex();
         await play(_playlist[_currentIndex]);
         return;
       }
       if (_currentIndex < _playlist.length - 1) {
         _currentIndex++;
+        debugPrint('[next] -> idx=$_currentIndex');
         await play(_playlist[_currentIndex]);
       } else if (state.playMode == 0) {
         _currentIndex = 0;
+        debugPrint('[next] loop -> idx=$_currentIndex');
         await play(_playlist[_currentIndex]);
+      } else {
+        debugPrint('[next] end, no loop');
       }
     } finally {
       _isSkipping = false;
@@ -326,12 +329,7 @@ class PlayerController extends StateNotifier<PlayerState> {
       await _handler.stop();
       state = state.copyWith(phase: PlayerPhase.paused);
       if (state.playMode == 2) {
-        final rng = Random();
-        var prevIdx = _currentIndex;
-        while (prevIdx == _currentIndex) {
-          prevIdx = rng.nextInt(_playlist.length);
-        }
-        _currentIndex = prevIdx;
+        _currentIndex = _randomIndex();
         await play(_playlist[_currentIndex]);
         return;
       }
@@ -350,10 +348,14 @@ class PlayerController extends StateNotifier<PlayerState> {
   Future<void> playUrl(String url, String title, String artist, {String? platform, String? id, String? lyric}) async {
     try {
       state = state.copyWith(phase: PlayerPhase.loading);
-      _currentSong = Song(id: 0, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
+      final songId = int.tryParse(id ?? '') ?? 0;
+      _currentSong = Song(id: songId, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
       _lyric = (lyric != null && lyric.isNotEmpty) ? LrcParser.parse(lyric) : null;
       _currentLyricIndex = -1;
       _playingUrlId = (platform != null && id != null) ? '$platform|$id' : null;
+      // 维护单曲 playlist，使 next/previous 可用
+      _playlist = [_currentSong!];
+      _currentIndex = 0;
 
       await _handler.loadSong(
         url: url,
@@ -366,22 +368,10 @@ class PlayerController extends StateNotifier<PlayerState> {
       state = state.copyWith(phase: PlayerPhase.playing);
       _syncCustomNotification(null);
       // 在线播放也写入历史，保证最新一条可被冷启动恢复
-      final songId = int.tryParse(id ?? '') ?? 0;
       if (songId != 0) {
         await PlaybackHistory().record(songId, title, artist, '', 0, 0, 0);
       }
-      _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
-      _durationSub = _handler.player.durationStream.listen((_) {});
-      _playingSub = _handler.player.playingStream.listen((playing) {
-        if (!playing && state.isPlaying) {
-          state = state.copyWith(phase: PlayerPhase.paused);
-        }
-      });
-      _completeSub = _handler.player.playerStateStream.listen((ps) {
-        if (ps.processingState == ProcessingState.completed) {
-          onSongEnd();
-        }
-      });
+      _wirePlayerStreams();
     } catch (e) {
       state = state.copyWith(phase: PlayerPhase.error);
     }
