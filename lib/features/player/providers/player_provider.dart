@@ -138,6 +138,11 @@ class PlayerController extends StateNotifier<PlayerState> {
   bool get lyricFailed => state.lyricFailed;
   void setPlaylist(List<Song> songs) {
     _playlist = songs;
+    // 修正 _currentIndex，解决冷启动恢复时 setPlaylist 晚于 load 导致的索引错位
+    if (_currentSong != null) {
+      final idx = _playlist.indexWhere((s) => s.id == _currentSong!.id);
+      if (idx >= 0) _currentIndex = idx;
+    }
   }
 
   Future<void> load(Song song) async {
@@ -168,7 +173,13 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   Future<void> _loadSongInternal(Song song) async {
     final index = _playlist.indexWhere((s) => s.id == song.id);
-    if (index >= 0) _currentIndex = index;
+    if (index >= 0) {
+      _currentIndex = index;
+    } else if (_playlist.isEmpty) {
+      // 冷启动恢复场景：歌单 API 还没返回，至少把当前歌加入播放列表
+      _playlist = [song];
+      _currentIndex = 0;
+    }
 
     _currentSong = song;
     _lyric = null;

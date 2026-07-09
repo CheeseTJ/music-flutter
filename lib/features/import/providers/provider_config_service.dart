@@ -22,10 +22,14 @@ class ProviderConfigService {
 
   static String? baseUrlFor(String source) {
     final configs = _cached;
-    if (configs == null) return null;
+    if (configs == null) {
+      debugPrint('[ProviderConfig] baseUrlFor("$source"): 配置未加载（_cached 为 null）');
+      return null;
+    }
     for (final c in configs) {
       if (c.source == source) return c.baseUrl;
     }
+    debugPrint('[ProviderConfig] baseUrlFor("$source"): 未找到匹配的 source，现有配置: ${configs.map((c) => c.source).toList()}');
     return null;
   }
 }

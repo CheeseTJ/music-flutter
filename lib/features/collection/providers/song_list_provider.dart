@@ -13,20 +13,16 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
       '${Directory.systemTemp.path}/music_song_cache.json';
 
   SongListNotifier(this._api) : super(const AsyncData([])) {
-    _init();
+    _loadCache();  // 同步加载缓存，立即显示
+    load();         // API 并行加载，不等缓存
   }
 
-  Future<void> _init() async {
-    await _loadCacheAsync();
-    await load();
-  }
-
-  Future<void> _loadCacheAsync() async {
+  void _loadCache() {
     try {
       final file = File(_cachePath);
-      if (!await file.exists()) return;
-      final json = await file.readAsString();
-      final list = await compute(_parseSongList, json);
+      if (!file.existsSync()) return;
+      final json = file.readAsStringSync();
+      final list = _parseSongList(json);
       if (list.isNotEmpty) state = AsyncData(list);
     } catch (_) {}
   }

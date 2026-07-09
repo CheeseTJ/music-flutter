@@ -16,6 +16,6 @@ void main() {
     systemNavigationBarIconBrightness: Brightness.light,
   ));
   PlatformCoverService.preloadCache();
-  ProviderConfigService.preload();
+  ProviderConfigService.preload(); // 后台加载，不阻塞启动
   runApp(const ProviderScope(child: MusicApp()));
 }

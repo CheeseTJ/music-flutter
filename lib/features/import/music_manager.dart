@@ -78,8 +78,7 @@ class MusicManager {
       case 'iqwq':
         return await _iqwqGetter.getUrl(song);
       default:
-        final server = song.extra?['server']?.toString() ?? 'netease';
-        return await _neteaseGetter.getUrl(song.id, server: server);
+        return await _neteaseGetter.getUrl(song);
     }
   }
 }

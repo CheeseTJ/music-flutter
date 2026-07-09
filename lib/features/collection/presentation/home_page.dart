@@ -97,6 +97,16 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   void _restoreOnce(WidgetRef ref) {
     if (_restored) return;
     _restored = true;
+
+    // 监听歌单加载：无论歌单何时就绪，都同步到播放器 playlist
+    // 解决冷启动时 PlaybackHistory 读取比 API 歌单数据更早到达的竞态问题
+    ref.listen(songListProvider, (prev, next) {
+      final songs = next.valueOrNull;
+      if (songs != null && songs.isNotEmpty) {
+        ref.read(playerProvider.notifier).setPlaylist(songs);
+      }
+    });
+
     PlaybackHistory().all.then((records) {
       if (!mounted || records.isEmpty) return;
       final last = records.first;
@@ -330,7 +340,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
         const SizedBox(height: 2),
         // Music List
         Expanded(
-          child: songsAsync.when(
+          child: Stack(
+            children: [
+              songsAsync.when(
             loading: () => Center(
               child: SizedBox(
                 width: 24, height: 24,
@@ -384,8 +396,21 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
               );
             },
           ),
-        ),
-      ],
+          // 定位当前播放歌曲按钮
+          if (hasSong && showMiniPlayer && currentSong != null && filtered.any((s) => s.id == currentSong.id))
+            Positioned(
+              right: 16,
+              bottom: miniPlayerHeight + 12,
+              child: _LocateButton(
+                scrollCtrl: _scrollCtrl,
+                targetId: currentSong.id,
+                filtered: filtered,
+              ),
+            ),
+        ],
+      ),
+    ),
+    ],
     );
   }
 
@@ -596,6 +621,67 @@ class _ErrorView extends StatelessWidget {
             child: const Text('重试'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LocateButton extends StatelessWidget {
+  final ScrollController scrollCtrl;
+  final int targetId;
+  final List<Song> filtered;
+
+  const _LocateButton({
+    required this.scrollCtrl,
+    required this.targetId,
+    required this.filtered,
+  });
+
+  static const double _kItemHeight = 72.0;
+
+  void _locate() {
+    final idx = filtered.indexWhere((s) => s.id == targetId);
+    if (idx < 0 || !scrollCtrl.hasClients) return;
+
+    final targetOffset = idx * _kItemHeight;
+    final maxScroll = scrollCtrl.position.maxScrollExtent;
+    final offset = targetOffset.clamp(0.0, maxScroll);
+
+    scrollCtrl.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _locate,
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: PearlColors.glassBgStrong(isDark),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.my_location_rounded,
+            size: 18,
+            color: PearlColors.accent(isDark),
+          ),
+        ),
       ),
     );
   }
