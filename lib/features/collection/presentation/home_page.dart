@@ -30,17 +30,20 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   String _greetingText = '';
   Timer? _greetingTimer;
   bool _restored = false;
+  bool _currentSongVisible = true;
 
   @override
   void initState() {
     super.initState();
     _updateGreeting();
     _scheduleGreetingRefresh();
+    _scrollCtrl.addListener(_checkVisibility);
   }
 
   @override
   void dispose() {
     _greetingTimer?.cancel();
+    _scrollCtrl.removeListener(_checkVisibility);
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -76,6 +79,38 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       _updateGreeting();
       _scheduleGreetingRefresh();
     });
+  }
+
+  /// 检测当前播放歌曲是否在 ListView 可视区域内。
+  /// 不可见时显示定位按钮，可见时自动隐藏。
+  void _checkVisibility() {
+    if (!_scrollCtrl.hasClients) return;
+    final currentSong = ref.read(playerProvider.notifier).currentSong;
+    if (currentSong == null) {
+      if (_currentSongVisible != true) {
+        setState(() => _currentSongVisible = true);
+      }
+      return;
+    }
+    final songs = ref.read(songListProvider).valueOrNull ?? [];
+    final filtered = _applyFilter(songs);
+    final idx = filtered.indexWhere((s) => s.id == currentSong.id);
+    if (idx < 0) {
+      if (_currentSongVisible != true) {
+        setState(() => _currentSongVisible = true);
+      }
+      return;
+    }
+
+    final viewport = _scrollCtrl.position.viewportDimension;
+    final offset = _scrollCtrl.position.pixels;
+    const itemH = 72.0;
+    final itemTop = idx * itemH - offset;
+    final itemBottom = (idx + 1) * itemH - offset;
+    final visible = itemBottom > 0 && itemTop < viewport;
+    if (visible != _currentSongVisible) {
+      setState(() => _currentSongVisible = visible);
+    }
   }
 
   void _scheduleRestore(WidgetRef ref) {
@@ -194,9 +229,13 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
     _scheduleRestore(ref);
 
+    // 每次 build 后重新检测当前歌曲可见性（覆盖切歌等场景）
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
+
     // Tab bar: 64 height + 16 bottom padding + safe area
     // Mini player: 68 height + 8 gap (only when song exists and setting is on)
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    // viewPadding 不受 ShellPage SafeArea(bottom:false) 影响
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final miniPlayerHeight = (hasSong && showMiniPlayer) ? 68.0 + 8.0 : 0.0;
     final listBottomPadding = 64.0 + 16.0 + bottomInset + miniPlayerHeight + 16.0;
 
@@ -396,15 +435,19 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
               );
             },
           ),
-          // 定位当前播放歌曲按钮
+          // 定位当前播放歌曲按钮（仅当歌曲滚出可视区域时显示）
           if (hasSong && showMiniPlayer && currentSong != null && filtered.any((s) => s.id == currentSong.id))
             Positioned(
               right: 16,
-              bottom: miniPlayerHeight + 12,
-              child: _LocateButton(
-                scrollCtrl: _scrollCtrl,
-                targetId: currentSong.id,
-                filtered: filtered,
+              bottom: 64.0 + 16.0 + bottomInset + miniPlayerHeight + 12,
+              child: AnimatedOpacity(
+                opacity: _currentSongVisible ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 300),
+                child: _LocateButton(
+                  scrollCtrl: _scrollCtrl,
+                  targetId: currentSong.id,
+                  filtered: filtered,
+                ),
               ),
             ),
         ],

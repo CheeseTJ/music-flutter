@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import '../../../core/utils/cache_dir.dart';
+import 'cache_dir.dart';
 
 class PlayRecord {
   final int songId;

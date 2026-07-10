@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
 import '../../../core/utils/settings.dart';
@@ -18,9 +20,15 @@ class _VaultPageState extends ConsumerState<VaultPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // 必须 watch  playerProvider 本身以订阅播放状态变化，否则歌曲切换时
+    // hasSong / miniPlayerHeight 不会更新，底部 padding 始终不包含迷你播放器
+    ref.watch(playerProvider);
     final hasSong = ref.watch(playerProvider.notifier).currentSong != null;
     final showMiniPlayer = ref.watch(showMiniPlayerProvider);
-    final bottomPadding = 72.0 + 20.0 + MediaQuery.of(context).padding.bottom + (hasSong && showMiniPlayer ? 68.0 + 8.0 : 0) + 24;
+    // viewPadding 不受 SafeArea(bottom:false) 影响，拿到真实设备底部高度
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final miniPlayerHeight = (hasSong && showMiniPlayer) ? 68.0 + 8.0 : 0.0;
+    final bottomPadding = 64.0 + 16.0 + bottomInset + miniPlayerHeight + 16.0;
     final songsAsync = ref.watch(songListProvider);
     final showUploadButton = ref.watch(showUploadButtonProvider);
 
@@ -39,54 +47,57 @@ class _VaultPageState extends ConsumerState<VaultPage> {
         );
     final totalStorage = audioSize + lyricBytes;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref.read(songListProvider.notifier).load();
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.fromLTRB(20, 4, 20, bottomPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _StorageHero(
-              totalStorage: totalStorage,
-              isDark: isDark,
-            ),
-            const SizedBox(height: 20),
+    return Column(
+      children: [
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await ref.read(songListProvider.notifier).load();
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(20, 4, 20, bottomPadding),
+              children: [
+                _StorageHero(
+                  totalStorage: totalStorage,
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 20),
 
-            _StatsCard(
-              totalSongs: totalSongs,
-              totalLyrics: totalLyrics,
-              isDark: isDark,
-            ),
-            const SizedBox(height: 28),
+                _StatsCard(
+                  totalSongs: totalSongs,
+                  totalLyrics: totalLyrics,
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 28),
 
-            _HistoryEntry(
-              isDark: isDark,
-              onTap: () => context.push('/history'),
-            ),
-            const SizedBox(height: 28),
+                _HistoryEntry(
+                  isDark: isDark,
+                  onTap: () => context.push('/history'),
+                ),
+                const SizedBox(height: 28),
 
-            _SettingsSection(
-              isDark: isDark,
-              showUploadButton: showUploadButton,
-              showMiniPlayer: showMiniPlayer,
-              onUploadButtonChanged: (v) async {
-                await Settings.setShowUploadButton(v);
-                ref.read(showUploadButtonProvider.notifier).state = v;
-              },
-              onMiniPlayerChanged: (v) async {
-                await Settings.setShowMiniPlayer(v);
-                ref.read(showMiniPlayerProvider.notifier).state = v;
-              },
-            ),
-            const SizedBox(height: 32),
+                _SettingsSection(
+                  isDark: isDark,
+                  showUploadButton: showUploadButton,
+                  showMiniPlayer: showMiniPlayer,
+                  onUploadButtonChanged: (v) async {
+                    await Settings.setShowUploadButton(v);
+                    ref.read(showUploadButtonProvider.notifier).state = v;
+                  },
+                  onMiniPlayerChanged: (v) async {
+                    await Settings.setShowMiniPlayer(v);
+                    ref.read(showMiniPlayerProvider.notifier).state = v;
+                  },
+                ),
+                const SizedBox(height: 32),
 
-            _AboutSection(isDark: isDark),
-          ],
+                _AboutSection(isDark: isDark),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -399,11 +410,20 @@ class _ToggleRow extends StatelessWidget {
 }
 
 // ============================================================
-//  About (version)
+//  About — version, copyright, GitHub link
 // ============================================================
 class _AboutSection extends StatelessWidget {
   final bool isDark;
   const _AboutSection({required this.isDark});
+
+  static const _githubUrl = 'https://github.com/CheeseTJ';
+
+  Future<void> _openGitHub() async {
+    final uri = Uri.parse(_githubUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -413,28 +433,72 @@ class _AboutSection extends StatelessWidget {
         _SectionTitle('About', isDark: isDark),
         const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: PearlColors.glassBgStrong(isDark),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
+          child: Column(
             children: [
-              Icon(Icons.info_outline, size: 20,
-                  color: PearlColors.accent(isDark)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text('Version',
-                    style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w500,
-                      color: PearlColors.textPrimary(isDark),
-                    )),
+              // Version row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 20,
+                        color: PearlColors.accent(isDark)),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text('Version',
+                          style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w500,
+                            color: PearlColors.textPrimary(isDark),
+                          )),
+                    ),
+                    Text('1.0.0',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: PearlColors.textSecondary(isDark),
+                        )),
+                  ],
+                ),
               ),
-              Text('1.0.0',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: PearlColors.textSecondary(isDark),
-                  )),
+              const SizedBox(height: 10),
+              Divider(
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+                color: PearlColors.bgTertiary(isDark),
+              ),
+              // Copyright + GitHub row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Copyright \u00a9 JuneT',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: PearlColors.textDisabled(isDark),
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _openGitHub,
+                      child: SvgPicture.asset(
+                        'assets/icons/Github.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(
+                          PearlColors.textSecondary(isDark),
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
