@@ -31,6 +31,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   Timer? _greetingTimer;
   bool _restored = false;
   bool _currentSongVisible = true;
+  int? _pendingRestoreId; // 冷启动待恢复的歌曲 ID
 
   @override
   void initState() {
@@ -133,41 +134,48 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     if (_restored) return;
     _restored = true;
 
-    // 监听歌单加载：无论歌单何时就绪，都同步到播放器 playlist
-    // 解决冷启动时 PlaybackHistory 读取比 API 歌单数据更早到达的竞态问题
+    // 歌单就绪时同步到播放器，同时尝试恢复 pending 歌曲
     ref.listen(songListProvider, (prev, next) {
       final songs = next.valueOrNull;
-      if (songs != null && songs.isNotEmpty) {
-        ref.read(playerProvider.notifier).setPlaylist(songs);
+      if (songs == null || songs.isEmpty) return;
+      final notifier = ref.read(playerProvider.notifier);
+      notifier.setPlaylist(songs);
+      // 若存在待恢复的歌曲 ID，查找完整 Song 后加载
+      if (_pendingRestoreId != null && notifier.currentSong == null) {
+        final target = songs.cast<Song?>().firstWhere(
+          (s) => s?.id == _pendingRestoreId,
+          orElse: () => null,
+        );
+        if (target != null) {
+          _pendingRestoreId = null;
+          notifier.load(target);
+        }
       }
     });
 
+    // 读取播放历史，获取上次播放的歌曲 ID
     PlaybackHistory().all.then((records) {
       if (!mounted || records.isEmpty) return;
-      final last = records.first;
+      final lastId = records.first.songId;
       final notifier = ref.read(playerProvider.notifier);
       if (notifier.currentSong != null) return;
 
-      // 直接从历史记录构造 Song 恢复，不等 songListProvider 加载完成
-      final song = Song(
-        id: last.songId,
-        title: last.title,
-        artist: last.artist,
-        album: '',
-        format: last.format,
-        duration: last.duration,
-        size: last.size,
-        type: '',
-        createdAt: last.playedAt,
-      );
-
-      // 若本地曲库已就绪，顺便设置 playlist 供 next/previous 使用
-      final songs = ref.read(songListProvider).valueOrNull;
-      if (songs != null && songs.isNotEmpty) {
-        notifier.setPlaylist(songs);
+      // 优先从缓存歌单中定位完整 Song
+      final cached = ref.read(songListProvider).valueOrNull;
+      if (cached != null && cached.isNotEmpty) {
+        final song = cached.cast<Song?>().firstWhere(
+          (s) => s?.id == lastId,
+          orElse: () => null,
+        );
+        if (song != null) {
+          notifier.setPlaylist(cached);
+          notifier.load(song);
+          return;
+        }
       }
 
-      notifier.load(song);
+      // 缓存中未找到，记录 ID，等待 ref.listen 中歌单就绪后恢复
+      _pendingRestoreId = lastId;
     });
   }
 

@@ -5,6 +5,7 @@ import '../../../core/theme/pearl_colors.dart';
 import '../../../core/utils/playback_history.dart';
 import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
+import '../../collection/providers/song_list_provider.dart';
 
 class PlayHistoryPage extends ConsumerStatefulWidget {
   const PlayHistoryPage({super.key});
@@ -62,20 +63,17 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
     setState(() => _records = []);
   }
 
-  Song _toSong(PlayRecord r) => Song(
-        id: r.songId,
-        title: r.title,
-        artist: r.artist,
-        album: '',
-        format: r.format,
-        duration: r.duration,
-        size: r.size,
-        createdAt: r.playedAt,
-      );
+  Song? _toSong(PlayRecord r, List<Song> songList) {
+    return songList.cast<Song?>().firstWhere(
+      (s) => s?.id == r.songId,
+      orElse: () => null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final songList = ref.watch(songListProvider).valueOrNull ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -110,11 +108,13 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
                   itemCount: _records.length,
                   itemBuilder: (ctx, i) {
                     final r = _records[i];
+                    final song = _toSong(r, songList);
+                    if (song == null) return const SizedBox.shrink();
                     return SongTile(
                       key: ValueKey('history_${r.songId}_${r.playedAt}'),
-                      song: _toSong(r),
+                      song: song,
                       onTap: () {
-                        context.push('/player', extra: _toSong(r));
+                        context.push('/player', extra: song);
                       },
                     );
                   },

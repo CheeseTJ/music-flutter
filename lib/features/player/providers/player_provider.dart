@@ -203,7 +203,7 @@ class PlayerController extends StateNotifier<PlayerState> {
       artUri: artUri,
     );
 
-    PlaybackHistory().record(song.id, song.title, song.artist, song.format, song.duration, 0, song.size);
+    PlaybackHistory().record(song.id);
   }
 
   void _wirePlayerStreams() {
@@ -380,7 +380,7 @@ class PlayerController extends StateNotifier<PlayerState> {
       _syncCustomNotification(null);
       // 在线播放也写入历史，保证最新一条可被冷启动恢复
       if (songId != 0) {
-        await PlaybackHistory().record(songId, title, artist, '', 0, 0, 0);
+        await PlaybackHistory().record(songId);
       }
       _wirePlayerStreams();
     } catch (e) {

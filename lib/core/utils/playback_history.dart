@@ -4,46 +4,19 @@ import 'cache_dir.dart';
 
 class PlayRecord {
   final int songId;
-  final String title;
-  final String artist;
-  final String format;
-  final int duration;
-  final int positionSeconds;
-  final int size;
   final int playedAt;
 
-  const PlayRecord({
-    required this.songId,
-    required this.title,
-    required this.artist,
-    required this.format,
-    required this.duration,
-    required this.positionSeconds,
-    this.size = 0,
-    required this.playedAt,
-  });
+  const PlayRecord({required this.songId, required this.playedAt});
 
   Map<String, dynamic> toJson() => {
-    'songId': songId,
-    'title': title,
-    'artist': artist,
-    'format': format,
-    'duration': duration,
-    'positionSeconds': positionSeconds,
-    'size': size,
-    'playedAt': playedAt,
-  };
+        'songId': songId,
+        'playedAt': playedAt,
+      };
 
   factory PlayRecord.fromJson(Map<String, dynamic> j) => PlayRecord(
-    songId: j['songId'] as int,
-    title: j['title'] as String,
-    artist: j['artist'] as String,
-    format: j['format'] as String,
-    duration: j['duration'] as int,
-    positionSeconds: j['positionSeconds'] as int,
-    size: j['size'] as int? ?? 0,
-    playedAt: j['playedAt'] as int,
-  );
+        songId: j['songId'] as int,
+        playedAt: j['playedAt'] as int,
+      );
 }
 
 class PlaybackHistory {
@@ -82,19 +55,11 @@ class PlaybackHistory {
     } catch (_) {}
   }
 
-  Future<void> record(int songId, String title, String artist, String format, int duration, int positionSeconds, int size) async {
+  Future<void> record(int songId) async {
     await _ensureLoaded();
     _records.removeWhere((r) => r.songId == songId);
-    _records.insert(0, PlayRecord(
-      songId: songId,
-      title: title,
-      artist: artist,
-      format: format,
-      duration: duration,
-      positionSeconds: positionSeconds,
-      size: size,
-      playedAt: DateTime.now().millisecondsSinceEpoch,
-    ));
+    _records.insert(
+        0, PlayRecord(songId: songId, playedAt: DateTime.now().millisecondsSinceEpoch));
     if (_records.length > 50) _records = _records.sublist(0, 50);
     await _save();
   }
