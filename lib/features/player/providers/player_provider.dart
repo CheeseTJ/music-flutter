@@ -190,9 +190,9 @@ class PlayerController extends StateNotifier<PlayerState> {
     final data = await _apiClient.getPlayUrl(song.id);
     final url = data['url'] as String;
 
-    _lastCoverUrl = await const PlatformCoverService().fetchUrl(song.type, song.title, song.artist);
+    _lastCoverUrl = await const PlatformCoverService().fetch(song.type, song.title, song.artist);
     final cover = _lastCoverUrl;
-    final artUri = cover != null ? Uri.parse(cover) : await _getFallbackArtUri();
+    final artUri = cover != null ? Uri.file(cover) : await _getFallbackArtUri();
 
     await _handler.loadSong(
       url: url,

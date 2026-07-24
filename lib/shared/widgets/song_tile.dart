@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,13 +39,17 @@ class _SongTileState extends ConsumerState<SongTile>
   void initState() {
     super.initState();
     _lastSongId = widget.song.id;
-    _coverUrl = PlatformCoverService.getCachedUrl(
+    _coverUrl = PlatformCoverService.getCachedPath(
       widget.song.type,
       widget.song.title,
       widget.song.artist,
     );
     if (_coverUrl == null) {
-      _fetchCover(widget.song);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _coverUrl == null) {
+          _fetchCover(widget.song);
+        }
+      });
     }
   }
 
@@ -55,7 +60,7 @@ class _SongTileState extends ConsumerState<SongTile>
         oldWidget.song.title != widget.song.title ||
         oldWidget.song.artist != widget.song.artist) {
       _lastSongId = widget.song.id;
-      _coverUrl = PlatformCoverService.getCachedUrl(
+      _coverUrl = PlatformCoverService.getCachedPath(
         widget.song.type,
         widget.song.title,
         widget.song.artist,
@@ -70,13 +75,13 @@ class _SongTileState extends ConsumerState<SongTile>
 
   Future<void> _fetchCover(Song song) async {
     final id = song.id;
-    final url = await const PlatformCoverService().fetchUrl(
+    final path = await const PlatformCoverService().fetch(
       song.type,
       song.title,
       song.artist,
     );
     if (!mounted || _lastSongId != id) return;
-    setState(() => _coverUrl = url);
+    setState(() => _coverUrl = path);
   }
 
   @override
@@ -174,16 +179,21 @@ class _SongTileState extends ConsumerState<SongTile>
     final accent = PearlColors.accent(isDark);
 
     if (_coverUrl != null) {
+      final isLocal = _coverUrl!.startsWith('/') || _coverUrl!.startsWith(r'\');
+      final imageWidget = isLocal
+          ? Image.file(File(_coverUrl!), width: 56, height: 56, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _coverPlaceholder(accent))
+          : CachedNetworkImage(
+              imageUrl: _coverUrl!,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => _coverPlaceholder(accent),
+              errorWidget: (_, __, ___) => _coverPlaceholder(accent),
+            );
       return Stack(
         children: [
-          CachedNetworkImage(
-            imageUrl: _coverUrl!,
-            width: 56,
-            height: 56,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => _coverPlaceholder(accent),
-            errorWidget: (_, __, ___) => _coverPlaceholder(accent),
-          ),
+          imageWidget,
           if (isPlaying && !isPaused)
             Positioned.fill(
               child: Container(

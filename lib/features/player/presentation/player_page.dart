@@ -50,7 +50,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
     _bgCtrl.repeat();
     _fadeCtrl.forward();
-    _coverUrl = PlatformCoverService.getCachedUrl(
+    _coverUrl = PlatformCoverService.getCachedPath(
       widget.song.type, widget.song.title, widget.song.artist,
     );
     _fetchCover(widget.song);
@@ -75,14 +75,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final id = song.id;
     _lastSongId = id;
 
-    final url = await const PlatformCoverService().fetchUrl(
+    final path = await const PlatformCoverService().fetch(
       song.type, song.title, song.artist,
     );
     if (!mounted || _lastSongId != id) return;
-    setState(() => _coverUrl = url);
+    setState(() => _coverUrl = path);
 
-    if (url != null) {
-      _extractColorFromUrl(url, id);
+    if (path != null) {
+      _extractColorFromUrl(path, id);
     } else {
       // Local song: tint the background animation to match the gradient
       // cover so the player feels visually coherent.
@@ -90,24 +90,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
   }
 
-  Future<void> _extractColorFromUrl(String url, int songId) async {
+  Future<void> _extractColorFromUrl(String path, int songId) async {
     try {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-      try {
-        final req = await client.getUrl(Uri.parse(url));
-        final resp = await req.close().timeout(const Duration(seconds: 6));
-        if (resp.statusCode != 200) return;
-
-        final bytes = await resp.fold<List<int>>(
-          <int>[], (prev, chunk) => prev..addAll(chunk),
-        );
-        if (!mounted || _lastSongId != songId) return;
-        final color = await extractDominantColor(Uint8List.fromList(bytes));
-        if (mounted && _lastSongId == songId) {
-          setState(() => _bgColor = color);
-        }
-      } finally {
-        client.close();
+      final bytes = await File(path).readAsBytes();
+      if (!mounted || _lastSongId != songId) return;
+      final color = await extractDominantColor(Uint8List.fromList(bytes));
+      if (mounted && _lastSongId == songId) {
+        setState(() => _bgColor = color);
       }
     } catch (_) {}
   }
@@ -264,15 +253,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
               child: _coverUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: _coverUrl!,
+                  ? Image.file(
+                      File(_coverUrl!),
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => _GradientCover(
-                        title: song.title,
-                        radius: PearlTheme.radiusXl,
-                        isDark: isDark,
-                      ),
-                      errorWidget: (_, __, ___) => _GradientCover(
+                      errorBuilder: (_, __, ___) => _GradientCover(
                         title: song.title,
                         radius: PearlTheme.radiusXl,
                         isDark: isDark,
@@ -421,7 +405,7 @@ class _PlayerControlsBar extends ConsumerWidget {
             icon: state.playMode == 2 ? Icons.shuffle_rounded
                 : state.playMode == 1 ? Icons.repeat_one_rounded
                 : Icons.repeat_rounded,
-            selected: state.playMode != 0,
+            selected: false,
             isDark: isDark,
             onTap: () => notifier.togglePlayMode(),
           ),

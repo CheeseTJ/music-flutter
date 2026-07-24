@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
+import '../../../core/network/platform_cover_service.dart';
 import '../../../core/utils/settings.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
@@ -347,10 +348,80 @@ class _SettingsSection extends StatelessWidget {
                 isDark: isDark,
                 onChanged: onMiniPlayerChanged,
               ),
+              Divider(height: 1, indent: 16, endIndent: 16, color: PearlColors.bgTertiary(isDark)),
+              _ClearCacheRow(isDark: isDark),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ClearCacheRow extends StatefulWidget {
+  final bool isDark;
+  const _ClearCacheRow({required this.isDark});
+
+  @override
+  State<_ClearCacheRow> createState() => _ClearCacheRowState();
+}
+
+class _ClearCacheRowState extends State<_ClearCacheRow> {
+  bool _clearing = false;
+
+  Future<void> _clear() async {
+    setState(() => _clearing = true);
+    await PlatformCoverService.clearAll();
+    if (!mounted) return;
+    setState(() => _clearing = false);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('封面缓存已清空'), duration: Duration(seconds: 1)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _clearing ? null : _clear,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      child: Row(
+        children: [
+          Icon(Icons.delete_sweep_outlined, size: 20,
+              color: PearlColors.accent(widget.isDark)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Clear Cover Cache',
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w500,
+                      color: PearlColors.textPrimary(widget.isDark),
+                    )),
+                const SizedBox(height: 2),
+                Text('Remove all cached cover images',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: PearlColors.textSecondary(widget.isDark),
+                    )),
+              ],
+            ),
+          ),
+          _clearing
+              ? SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: PearlColors.accent(widget.isDark),
+                  ))
+              : SizedBox(width: 20),
+        ],
+      ),
+      ),
     );
   }
 }

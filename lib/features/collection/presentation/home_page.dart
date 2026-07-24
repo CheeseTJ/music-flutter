@@ -105,7 +105,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
     final viewport = _scrollCtrl.position.viewportDimension;
     final offset = _scrollCtrl.position.pixels;
-    const itemH = 72.0;
+    const itemH = 68.0;
     final itemTop = idx * itemH - offset;
     final itemBottom = (idx + 1) * itemH - offset;
     final visible = itemBottom > 0 && itemTop < viewport;
@@ -418,7 +418,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                     controller: _scrollCtrl,
                     physics: const AlwaysScrollableScrollPhysics(),
                     // ignore: deprecated_member_use
-                    cacheExtent: 2000,
+                    cacheExtent: 500,
                     padding: EdgeInsets.only(bottom: listBottomPadding),
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
@@ -688,7 +688,7 @@ class _LocateButton extends StatelessWidget {
     required this.filtered,
   });
 
-  static const double _kItemHeight = 72.0;
+  static const double _kItemHeight = 68.0;
 
   void _locate() {
     final idx = filtered.indexWhere((s) => s.id == targetId);

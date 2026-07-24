@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/debug/layout_debug.dart';
-import 'core/network/platform_cover_service.dart';
 import 'features/import/providers/provider_config_service.dart';
 
 void main() {
@@ -15,7 +14,6 @@ void main() {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
-  PlatformCoverService.preloadCache();
   ProviderConfigService.preload(); // 后台加载，不阻塞启动
   runApp(const ProviderScope(child: MusicApp()));
 }
