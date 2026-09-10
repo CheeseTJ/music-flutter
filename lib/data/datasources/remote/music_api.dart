@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../import/models/song.dart';
+import '../../../features/import/models/song.dart';
 
 /// music-api（music.june-t.top）客户端：聚合搜索 / 取链 / 歌词。
 ///

@@ -444,7 +444,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             },
           ),
           // 定位当前播放歌曲按钮（仅当歌曲滚出可视区域时显示）
-          if (hasSong && showMiniPlayer && currentSong != null && filtered.any((s) => s.id == currentSong.id))
+          if (hasSong && showMiniPlayer && filtered.any((s) => s.id == currentSong.id))
             Positioned(
               right: 16,
               bottom: 64.0 + 16.0 + bottomInset + miniPlayerHeight + 12,
