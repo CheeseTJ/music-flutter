@@ -16,115 +16,32 @@ import 'package:music_app/features/import/models/song.dart';
 import 'package:music_app/features/import/music_manager.dart';
 import 'package:music_app/data/datasources/remote/api_client.dart';
 import 'package:music_app/data/models/song.dart' as local_song;
-import 'package:music_app/core/network/platform_cover_service.dart';
-import 'package:music_app/core/utils/settings.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
 
 
 
-enum _MusicPlatform {
-  netease,
-  qq;
+/// 在线结果来自 music-api 聚合接口，provider 可能是 netease/qq/kuwo/kugou/...
+/// 这里只负责按平台渲染图标与配色（不再作为筛选条件）。
+class MusicPlatformMeta {
+  static const neteaseColor = Color(0xFFEC4141);
+  static const qqColor = Color(0xFF31C27C);
 
-  String get label {
-    switch (this) {
-      case _MusicPlatform.netease: return '\u7f51\u6613\u4e91';
-      case _MusicPlatform.qq: return 'QQ\u97f3\u4e50';
+  static Color color(String platform, bool isDark) {
+    switch (platform) {
+      case 'netease':
+        return neteaseColor;
+      case 'qq':
+        return qqColor;
+      default:
+        return const Color(0xFF7C8CF8);
     }
   }
 
-  IconData get icon {
-    switch (this) {
-      case _MusicPlatform.netease: return Icons.cloud_rounded;
-      case _MusicPlatform.qq: return Icons.music_note_rounded;
-    }
-  }
-
-  Color color(bool isDark) {
-    switch (this) {
-      case _MusicPlatform.netease: return const Color(0xFFEC4141);
-      case _MusicPlatform.qq: return const Color(0xFF31C27C);
-    }
-  }
-
-  String get typeKey {
-    switch (this) {
-      case _MusicPlatform.netease: return 'netease';
-      case _MusicPlatform.qq: return 'qq';
-    }
-  }
-
-  Widget platformIcon(double size) {
-    final asset = switch (this) {
-      _MusicPlatform.netease => 'assets/icons/网易云音乐.svg',
-      _MusicPlatform.qq => 'assets/icons/QQ音乐.svg',
-    };
-    return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
-  }
-
-  /// Memoised icon cache keyed by (platform, size). Without this, the
-  /// dropdown trigger and menu item re-create the SvgPicture on every
-  /// rebuild, which forces the SVG parser to re-evaluate.
-  static final Map<(int, double), Widget> _iconCache = {};
-  Widget platformIconCached(double size) {
-    final key = (index, size);
-    return _iconCache.putIfAbsent(key, () => platformIcon(size));
-  }
-}
-enum _SearchSource {
-  net90svip,
-  bingdou,
-  iqwq,
-  ausearcher,
-  meting;
-
-  String get label {
-    switch (this) {
-      case _SearchSource.net90svip: return '90Svip';
-      case _SearchSource.bingdou: return 'BingDou';
-      case _SearchSource.iqwq: return 'Iwqw';
-      case _SearchSource.ausearcher: return 'AuSearch';
-      case _SearchSource.meting: return 'meting';
-    }
-  }
-
-  IconData get icon {
-    switch (this) {
-      case _SearchSource.net90svip: return Icons.language_rounded;
-      case _SearchSource.bingdou: return Icons.ac_unit_rounded;
-      case _SearchSource.iqwq: return Icons.waves_rounded;
-      case _SearchSource.ausearcher: return Icons.travel_explore_rounded;
-      case _SearchSource.meting: return Icons.cloud_rounded;
-    }
-  }
-
-  Color color(bool isDark) {
-    switch (this) {
-      case _SearchSource.net90svip: return const Color(0xFF26A69A);
-      case _SearchSource.bingdou: return const Color(0xFF4FC3F7);
-      case _SearchSource.iqwq: return const Color(0xFFAB47BC);
-      case _SearchSource.ausearcher: return const Color(0xFFFF7043);
-      case _SearchSource.meting: return const Color(0xFFEC4141);
-    }
-  }
-
-  String get sourceKey {
-    switch (this) {
-      case _SearchSource.net90svip: return 'net90svip';
-      case _SearchSource.bingdou: return 'bingdou';
-      case _SearchSource.iqwq: return 'iqwq';
-      case _SearchSource.ausearcher: return 'ausearcher';
-      case _SearchSource.meting: return 'netease';
-    }
-  }
-
-  Widget platformIcon(double size) {
-    final asset = switch (this) {
-      _SearchSource.net90svip => null,
-      _SearchSource.bingdou => null,
-      _SearchSource.iqwq => null,
-      _SearchSource.ausearcher => null,
-      _SearchSource.meting => 'assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg',
+  static Widget icon(String platform, double size, {bool isDark = true}) {
+    final asset = switch (platform) {
+      'netease' => 'assets/icons/网易云音乐.svg',
+      'qq' => 'assets/icons/QQ音乐.svg',
+      _ => null,
     };
     if (asset != null) {
       return SvgPicture.asset(asset, width: size, height: size, fit: BoxFit.contain);
@@ -133,18 +50,35 @@ enum _SearchSource {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color(true).withValues(alpha: 0.12),
+        color: color(platform, isDark).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(size * 0.2),
       ),
-      child: Icon(icon, size: size * 0.7, color: color(true)),
+      child: Icon(Icons.library_music_rounded,
+          size: size * 0.7, color: color(platform, isDark)),
     );
   }
 
-  /// Memoised icon cache keyed by (source, size).
-  static final Map<(int, double), Widget> _iconCache = {};
-  Widget platformIconCached(double size) {
-    final key = (index, size);
-    return _iconCache.putIfAbsent(key, () => platformIcon(size));
+  static String label(String platform) {
+    switch (platform) {
+      case 'netease':
+        return '网易云';
+      case 'qq':
+        return 'QQ';
+      case 'kuwo':
+        return '酷我';
+      case 'kugou':
+        return '酷狗';
+      case 'migu':
+        return '咪咕';
+      default:
+        return platform.toUpperCase();
+    }
+  }
+
+  /// Memoised icon cache keyed by (platform, size).
+  static final Map<(String, double), Widget> _iconCache = {};
+  static Widget iconCached(String platform, double size) {
+    return _iconCache.putIfAbsent((platform, size), () => icon(platform, size));
   }
 }
 
@@ -163,13 +97,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   List<local_song.Song> _localResults = [];
   bool _loading = false;
   String _error = '';
-  _SearchSource _activeSource = _SearchSource.meting;
-  _MusicPlatform _activePlatform = _MusicPlatform.netease;
   /// Song currently being imported: key is "${platform}|${id}" so multiple
   /// tiles can be in different import states (one loading, one idle, one
   /// failed). `null` means no active import.
   String? _importingSongKey;
-  final _platformCover = const PlatformCoverService();
   List<String> _history = [];
   static const _historyKey = 'search_history';
   static const _maxHistory = 20;
@@ -194,8 +125,6 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
         TextPosition(offset: widget.initialQuery.length),
       );
     }
-    _loadSavedSource();
-    _loadSavedPlatform();
     _loadHistory();
     // If we have an initial query from the home page, kick off a search
     // once the providers are ready (post-frame).
@@ -206,35 +135,6 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           _doSearch(widget.initialQuery);
         }
       });
-    }
-  }
-
-  Future<void> _loadSavedSource() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('search_source');
-    if (saved != null) {
-      final src = _SearchSource.values.where((s) => s.sourceKey == saved).firstOrNull;
-      if (src != null && mounted) setState(() => _activeSource = src);
-    }
-  }
-
-  Future<String?> _resolveCover(String title, String artist, String? coverUrl, String type) async {
-    if (coverUrl != null && coverUrl.isNotEmpty) {
-      try {
-        final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 2)));
-        final resp = await dio.head(coverUrl);
-        if (resp.statusCode == 200) return coverUrl;
-      } catch (_) {}
-    }
-    return _platformCover.fetchUrl(type, title, artist);
-  }
-
-  Future<void> _loadSavedPlatform() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('music_platform');
-    if (saved != null) {
-      final plat = _MusicPlatform.values.where((p) => p.typeKey == saved).firstOrNull;
-      if (plat != null && mounted) setState(() => _activePlatform = plat);
     }
   }
 
@@ -258,20 +158,6 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     final prefs = await SharedPreferences.getInstance();
     prefs.remove(_historyKey);
     setState(() {});
-  }
-
-  Future<void> _onPlatformChanged(_MusicPlatform plat) async {
-    if (plat == _activePlatform) return;
-    setState(() => _activePlatform = plat);
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('music_platform', plat.typeKey);
-    _doSearch(_searchCtrl.text);
-  }
-  Future<void> _onSourceChanged(_SearchSource src) async {
-    setState(() => _activeSource = src);
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('search_source', src.sourceKey);
-    _doSearch(_searchCtrl.text);
   }
 
   @override
@@ -315,9 +201,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 
     try {
       final mgr = ref.read(musicManagerProvider);
-      final source = _activeSource.sourceKey;
-      final musicType = _activePlatform.typeKey;
-      final results = await mgr.search(source, musicType, q);
+      final results = await mgr.search(q);
 
       if (!mounted) return;
       if (mySeq != _searchSeq) return;
@@ -395,7 +279,8 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 
     try {
       final mgr = ref.read(musicManagerProvider);
-      final url = await mgr.getUrl(song);
+      // 播放默认选最高音质：并发各档位取链，选实际 bitrate 最高的结果。
+      final url = await mgr.getBestUrl(song);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -405,8 +290,9 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
         return;
       }
       final notifier = ref.read(playerProvider.notifier);
+      final lrc = await mgr.getLyric(song);
       await notifier.playUrl(url.url, song.name, song.singer,
-          platform: song.platform, id: song.id, lyric: url.lrc);
+          platform: song.platform, id: song.id, lyric: lrc.isEmpty ? null : lrc);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -419,7 +305,75 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     }
   }
 
+  /// 导入前弹出音质选择（来自搜索结果的 qualityOptions），
+  /// 未提供音质选项时直接按默认档导入。
   Future<void> _doImport(Song song) async {
+    final mgr = ref.read(musicManagerProvider);
+    final options = mgr.qualityOptionsOf(song);
+    String? quality;
+    if (options.isNotEmpty) {
+      quality = await _pickQuality(song, options);
+      if (quality == null) return; // 用户取消
+    }
+    await _importWithQuality(song, quality);
+  }
+
+  Future<String?> _pickQuality(Song song, List<Map<String, dynamic>> options) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: PearlColors.bgSecondary(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '导入音质 · ${song.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: PearlColors.textPrimary(isDark),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...options.map((opt) => ListTile(
+                  dense: true,
+                  leading: Icon(Icons.high_quality_rounded,
+                      size: 20, color: PearlColors.accent(isDark)),
+                  title: Text(
+                    opt['label']?.toString() ?? opt['value']?.toString() ?? '未知',
+                    style: TextStyle(
+                        fontSize: 14, color: PearlColors.textPrimary(isDark)),
+                  ),
+                  trailing: Text(
+                    '${opt['quality'] ?? ''} ${opt['format'] ?? ''}'.trim(),
+                    style: TextStyle(
+                        fontSize: 12, color: PearlColors.textDisabled(isDark)),
+                  ),
+                  onTap: () => Navigator.pop(ctx, opt['value']?.toString()),
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _importWithQuality(Song song, String? quality) async {
     final key = '${song.platform}|${song.id}';
     // Re-tap the same tile or tap another tile while one is in flight:
     // the original behavior disabled all imports while one was running,
@@ -431,7 +385,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     });
     try {
       final mgr = ref.read(musicManagerProvider);
-      final url = await mgr.getUrl(song);
+      final url = await mgr.getUrl(song, quality: quality);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -460,11 +414,12 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       }
 
       // 上传歌词（如有）
-        if (url.lrc != null && url.lrc!.isNotEmpty) {
+        final lrc = await mgr.getLyric(song);
+        if (lrc.isNotEmpty) {
           final songData = result['song'] as Map<String, dynamic>?;
           final songId = songData?['id'] as int?;
           if (songId != null) {
-            try { await api.uploadLyric(songId, url.lrc!); } catch (_) {}
+            try { await api.uploadLyric(songId, lrc); } catch (_) {}
           }
         }
 
@@ -556,17 +511,6 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _MusicPlatformDropdown(
-                          activePlatform: _activePlatform,
-                          isDark: isDark,
-                          onChanged: _onPlatformChanged,
-                        ),
-                        const SizedBox(width: 8),
-                        _PlatformDropdown(
-                          activeSource: _activeSource,
-                          isDark: isDark,
-                          onChanged: _onSourceChanged,
-                        ),
                       ],
                     ),
                   ),
@@ -754,7 +698,8 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                 onImport: () => _doImport(song),
                 isPlaying: '${song.platform}|${song.id}' == playingUrlId,
                 playerPhase: playerPhase,
-                coverFuture: _resolveCover(song.name, song.singer, song.cover, song.platform),
+                coverFuture: Future.value(
+                    (song.cover != null && song.cover!.isNotEmpty) ? song.cover : null),
                 isImporting: _importingSongKey == '${song.platform}|${song.id}',
               ),
         ],
@@ -773,99 +718,6 @@ Widget _placeholderIcon(Color badgeColor, IconData icon) {
   );
 }
 
-
-class _MusicPlatformDropdown extends StatelessWidget {
-  final _MusicPlatform activePlatform;
-  final bool isDark;
-  final ValueChanged<_MusicPlatform> onChanged;
-
-  const _MusicPlatformDropdown({
-    required this.activePlatform,
-    required this.isDark,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // PopupMenuButton has built-in hit-testing and a smoother Material
-    // transition than GestureDetector + showMenu, so it removes the
-    // adjacent-tap misfires that made the previous implementation feel
-    // janky.
-    return PopupMenuButton<_MusicPlatform>(
-      tooltip: '',
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 6),
-      elevation: 8,
-      color: PearlColors.bgSecondary(isDark),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: onChanged,
-      itemBuilder: (_) => _MusicPlatform.values.map((plat) {
-        final active = plat == activePlatform;
-        return PopupMenuItem<_MusicPlatform>(
-          value: plat,
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              plat.platformIconCached(22),
-              const SizedBox(width: 8),
-              Text(plat.label, style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: active ? plat.color(isDark) : PearlColors.textPrimary(isDark),
-              )),
-            ],
-          ),
-        );
-      }).toList(),
-      child: activePlatform.platformIconCached(30),
-    );
-  }
-}
-class _PlatformDropdown extends StatelessWidget {
-  final _SearchSource activeSource;
-  final bool isDark;
-  final ValueChanged<_SearchSource> onChanged;
-
-  const _PlatformDropdown({
-    required this.activeSource,
-    required this.isDark,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<_SearchSource>(
-      tooltip: '',
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 6),
-      elevation: 8,
-      color: PearlColors.bgSecondary(isDark),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: onChanged,
-      itemBuilder: (_) => _SearchSource.values.map((src) {
-        final active = src == activeSource;
-        return PopupMenuItem<_SearchSource>(
-          value: src,
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              src.platformIconCached(22),
-              const SizedBox(width: 8),
-              Text(src.label, style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: active ? src.color(isDark) : PearlColors.textPrimary(isDark),
-              )),
-            ],
-          ),
-        );
-      }).toList(),
-      child: activeSource.platformIconCached(30),
-    );
-  }
-}
 
 class _ResultTile extends StatelessWidget {
   final Song song;
@@ -890,14 +742,9 @@ class _ResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final platformEnum = _SearchSource.values.firstWhere(
-      (s) => s.sourceKey == song.platform,
-      orElse: () => _SearchSource.meting,
-    );
-    final platformColor = platformEnum.color(isDark);
-    final isMeting = song.source == 'meting';
-    final badgeColor = isMeting ? PearlColors.textSecondary(isDark) : platformColor;
+    final badgeColor = MusicPlatformMeta.color(song.platform, isDark);
     final accentColor = PearlColors.accent(isDark);
+    final platformIcon = MusicPlatformMeta.iconCached(song.platform, 22);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -929,10 +776,10 @@ class _ResultTile extends StatelessWidget {
                                   fit: StackFit.expand,
                                   children: [
                                     Image.network(snap.data!, fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => _placeholderIcon(badgeColor, platformEnum.icon)),
+                                      errorBuilder: (_, __, ___) => _placeholderIcon(badgeColor, Icons.music_note_rounded)),
                                   ],
                                 )
-                              : _placeholderIcon(badgeColor, platformEnum.icon),
+                              : _placeholderIcon(badgeColor, Icons.music_note_rounded),
                         );
                       },
                     ),
@@ -956,6 +803,8 @@ class _ResultTile extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 4),
+                              platformIcon,
                             ],
                           ),
                           const SizedBox(height: 2),

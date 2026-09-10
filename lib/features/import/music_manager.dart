@@ -1,85 +1,66 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/datasources/remote/music_api.dart';
 import 'models/song.dart';
-import 'providers/qijieya_provider.dart';
-import 'providers/bingdou_provider.dart';
-import 'providers/90svip_provider.dart';
-import 'providers/ausearcher_provider.dart';
-import 'providers/iqwq_provider.dart';
-import 'providers/provider_config_service.dart';
 
+/// 在线搜索/取链统一走 music-api（聚合接口），不再区分线路。
 class MusicManager {
-  final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 15),
-  ));
+  final MusicApi _api = MusicApi();
 
-  NeteaseQijieyaProvider? _netease;
-  BingdouProvider? _bingdou;
-  Netease90SvipProvider? _net90svip;
-  AusearcherProvider? _ausearcher;
-  IqwqProvider? _iqwq;
-
-  NeteaseQijieyaProvider get _neteaseGetter {
-    _netease ??= NeteaseQijieyaProvider(_dio,
-        baseUrl: ProviderConfigService.baseUrlFor('qijieya') ?? '');
-    return _netease!;
+  Future<List<Song>> search(String keyword, {int num = 30}) {
+    return _api.search(keyword, limit: num);
   }
 
-  BingdouProvider get _bingdouGetter {
-    _bingdou ??= BingdouProvider(_dio,
-        baseUrl: ProviderConfigService.baseUrlFor('bingdou') ?? '');
-    return _bingdou!;
+  /// [quality] 为空 = 播放场景（默认最高音质）；导入场景由调用方传入用户所选档位。
+  Future<SongUrl?> getUrl(Song song, {String? quality}) async {
+    return await _api.getUrl(song, quality: quality);
   }
 
-  Netease90SvipProvider get _net90svipGetter {
-    _net90svip ??= Netease90SvipProvider(_dio,
-        baseUrl: ProviderConfigService.baseUrlFor('net90svip') ?? '');
-    return _net90svip!;
+  Future<String> getLyric(Song song) {
+    return _api.getLyric(song);
   }
 
-  AusearcherProvider get _ausearcherGetter {
-    _ausearcher ??= AusearcherProvider(_dio,
-        baseUrl: ProviderConfigService.baseUrlFor('ausearcher') ?? '');
-    return _ausearcher!;
-  }
-
-  IqwqProvider get _iqwqGetter {
-    _iqwq ??= IqwqProvider(_dio,
-        baseUrl: ProviderConfigService.baseUrlFor('iqwq') ?? '');
-    return _iqwq!;
-  }
-
-  Future<List<Song>> search(String source, String musicType, String keyword, {int num = 20}) async {
-    switch (source) {
-      case 'netease':
-        return await _neteaseGetter.search(keyword, musicType: musicType, limit: num);
-      case 'bingdou':
-        return await _bingdouGetter.search(keyword, musicType: musicType);
-      case 'net90svip':
-        return await _net90svipGetter.search(keyword, musicType: musicType);
-      case 'ausearcher':
-        return await _ausearcherGetter.search(keyword, musicType: musicType);
-      case 'iqwq':
-        return await _iqwqGetter.search(keyword, musicType: musicType);
-      default:
-        return [];
+  /// 播放场景：拿真实最高音质的直链。
+  ///
+  /// 高档位在后端可能因无资源降级（如 jymaster 档降成 mp3 128k，而 hires 档
+  /// 反而是 flac），所以并发请求所有档位，选 bitrate 最高的实际结果；
+  /// 全部失败时回退默认档。音质选项缺失时只请求一次默认档。
+  Future<SongUrl?> getBestUrl(Song song) async {
+    final opts = qualityOptionsOf(song);
+    if (opts.length < 2) {
+      return await _api.getUrl(song, quality: bestQualityOf(song));
     }
+    final results = await Future.wait(
+      opts.map((o) async {
+        try {
+          return await _api.getUrl(song, quality: o['value']?.toString());
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    final ok = results.whereType<SongUrl>().where((r) => r.url.isNotEmpty).toList();
+    if (ok.isEmpty) return await _api.getUrl(song);
+    ok.sort((a, b) => (b.bitrate ?? 0).compareTo(a.bitrate ?? 0));
+    return ok.first;
   }
 
-  Future<SongUrl?> getUrl(Song song, {String quality = 'sq'}) async {
-    switch (song.source) {
-      case 'bingdou':
-        return await _bingdouGetter.getUrl(song);
-      case 'net90svip':
-        return await _net90svipGetter.getUrl(song);
-      case 'ausearcher':
-        return await _ausearcherGetter.getUrl(song);
-      case 'iqwq':
-        return await _iqwqGetter.getUrl(song);
-      default:
-        return await _neteaseGetter.getUrl(song);
+  /// 该歌曲可选的音质档位列表（来自搜索结果的 qualityOptions），
+  /// 形如 [{value, label, quality, format}]；后端未提供时返回空。
+  List<Map<String, dynamic>> qualityOptionsOf(Song song) {
+    final opts = song.extra?['qualityOptions'];
+    if (opts is List) {
+      return opts.whereType<Map<String, dynamic>>().toList();
     }
+    return [];
+  }
+
+  /// 默认最高音质：qualityOptions 的最后一档；未知结构时回退 null（后端默认档）。
+  String? bestQualityOf(Song song) {
+    final opts = qualityOptionsOf(song);
+    if (opts.isNotEmpty) {
+      return opts.last['value']?.toString();
+    }
+    return null;
   }
 }
 

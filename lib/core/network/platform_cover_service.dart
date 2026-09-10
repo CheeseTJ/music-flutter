@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'itunes_cover_service.dart';
-import '../../features/import/providers/provider_config_service.dart';
 
 class PlatformCoverService {
   // 内存缓存：key → 本地文件路径（null = 已知不存在）
@@ -80,10 +79,6 @@ class PlatformCoverService {
         picUrl = await const ITunesCoverService().fetchUrl(title, artist);
       }
 
-      if (picUrl == null) {
-        picUrl = await _searchTitleOnly(title);
-      }
-
       if (picUrl == null || picUrl.isEmpty) {
         _cache[key] = null;
         return null;
@@ -107,18 +102,6 @@ class PlatformCoverService {
     final results = await Future.wait([
       _searchMeting('netease', title, artist),
       _searchMeting('tencent', title, artist),
-    ]);
-    return results.firstWhere(
-      (r) => r != null && r.isNotEmpty,
-      orElse: () => null,
-    );
-  }
-
-  // ── 仅用歌曲名搜索（最后兜底） ──
-  Future<String?> _searchTitleOnly(String title) async {
-    final results = await Future.wait([
-      _searchMeting('netease', title, ''),
-      _searchMeting('tencent', title, ''),
     ]);
     return results.firstWhere(
       (r) => r != null && r.isNotEmpty,
@@ -181,8 +164,8 @@ class PlatformCoverService {
   Future<String?> _searchMeting(
       String server, String title, String artist) async {
     final query = Uri.encodeComponent('$title $artist');
-    final base = ProviderConfigService.baseUrlFor('qijieya');
-    if (base == null) return null;
+    // 与后端 music-api 同源的 meting 兜底源（qijieya）
+    const base = 'https://api.qijieya.cn/meting/';
     final url = '$base?server=$server&type=search&id=$query&limit=1';
 
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
