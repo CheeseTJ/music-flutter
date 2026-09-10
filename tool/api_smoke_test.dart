@@ -77,7 +77,9 @@ Future<void> main() async {
       '${opts[i]['value']}=${normBitrate(urls[i])}k'
   ].join(' ')}');
   stdout.writeln('     选中: ${chosen['type']} bitrate=${normBitrate(chosen)}k');
-  check('选优生效(flac/高码率优先)', normBitrate(chosen) >= 999, '选中仅 ${normBitrate(chosen)}k');
+  // 断言：选中的必须是所有可用档位里实际码率最高的（上游全降级时选中唯一档也正确）
+  final maxB = okUrls.map(normBitrate).reduce((a, b) => a > b ? a : b);
+  check('选优生效(选中=实际最高档)', normBitrate(chosen) == maxB, '选中${normBitrate(chosen)}k != 最高${maxB}k');
 
   // 3. 导入指定音质（单次请求明确档位）
   if (opts.length > 1) {
