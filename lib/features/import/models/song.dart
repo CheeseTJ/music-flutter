@@ -46,8 +46,9 @@ class SongUrl {
   final String? lrc;
   final String? ext;
   final int? bitrate; // kbps；用于挑选实际最高的档位
+  final bool trial; // 试听片段（网易匿名对 VIP 歌部分档位返回 30s）
   final String source; // 最终由哪条线路提供
   final String? reason; // need_cookie 等后端状态标识
 
-  SongUrl({required this.url, this.lrc, this.ext, this.bitrate, this.source = 'dedicated', this.reason});
+  SongUrl({required this.url, this.lrc, this.ext, this.bitrate, this.trial = false, this.source = 'dedicated', this.reason});
 }

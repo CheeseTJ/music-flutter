@@ -44,6 +44,7 @@ class MusicApi {
       url: data['url'] as String? ?? '',
       ext: (data['type'] as String?)?.split('/').last,
       bitrate: _normalizeBitrate(data['bitrate']),
+      trial: data['trial'] == true,
       source: song.platform,
     );
   }

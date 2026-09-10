@@ -386,7 +386,8 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     });
     try {
       final mgr = ref.read(musicManagerProvider);
-      final url = await mgr.getUrl(song, quality: quality);
+      // 优先用户所选档位；若命中 30s 试听片段则自动回退到最高的完整版档位。
+      final url = await mgr.getUrlForImport(song, quality);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -401,6 +402,19 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       final tempDir = await getTemporaryDirectory();
       final tempPath = '${tempDir.path}import_${DateTime.now().millisecondsSinceEpoch}.$ext';
       await _downloadFile(url.url, tempPath);
+
+      // 提示：所选档为 30s 试听，已自动改用完整版（或全部试听时保留试听）
+      if (url.trial && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${song.name} 仅提供试听片段（30s）'),
+              backgroundColor: const Color(0xFFB26A00)),
+        );
+      } else if (url.reason == 'trial_fallback' && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('所选音质为试听片段，已自动改用完整版（${(url.bitrate ?? 0)}kbps）'),
+              backgroundColor: const Color(0xFF2E7D32)),
+        );
+      }
 
       // 走现有的本地上传逻辑
       final api = ref.read(apiClientProvider);

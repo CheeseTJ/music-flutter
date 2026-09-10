@@ -23,6 +23,7 @@ class MusicManager {
   ///
   /// 高档位在后端可能因无资源降级（如 jymaster 档降成 mp3 128k，而 hires 档
   /// 反而是 flac），所以并发请求所有档位，选 bitrate 最高的实际结果；
+  /// 试听片段（trial）的档位排到最后，仅当全部试听时才用；
   /// 全部失败时回退默认档。音质选项缺失时只请求一次默认档。
   Future<SongUrl?> getBestUrl(Song song) async {
     final opts = qualityOptionsOf(song);
@@ -40,8 +41,58 @@ class MusicManager {
     );
     final ok = results.whereType<SongUrl>().where((r) => r.url.isNotEmpty).toList();
     if (ok.isEmpty) return await _api.getUrl(song);
-    ok.sort((a, b) => (b.bitrate ?? 0).compareTo(a.bitrate ?? 0));
+    // 排序：完整版优先于试听，再按码率从高到低
+    ok.sort((a, b) {
+      if (a.trial != b.trial) return a.trial ? 1 : -1;
+      return (b.bitrate ?? 0).compareTo(a.bitrate ?? 0);
+    });
     return ok.first;
+  }
+
+  /// 导入场景：优先使用用户所选档位；若该档是 30s 试听片段，
+  /// 自动回退到其余档位中最高的完整版（全部试听时才用当前档）。
+  Future<SongUrl?> getUrlForImport(Song song, String? quality) async {
+    SongUrl? chosen;
+    try {
+      chosen = await _api.getUrl(song, quality: quality);
+    } catch (_) {
+      chosen = null;
+    }
+    if (chosen != null && chosen.url.isNotEmpty && !chosen.trial) {
+      return chosen;
+    }
+
+    // 所选档不可用或为试听：并发其余档位找完整版
+    final opts = qualityOptionsOf(song);
+    final fallbackOpts = opts
+        .where((o) => o['value']?.toString() != quality)
+        .toList();
+    final results = await Future.wait(
+      fallbackOpts.map((o) async {
+        try {
+          return await _api.getUrl(song, quality: o['value']?.toString());
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+    final ok = results.whereType<SongUrl>().where((r) => r.url.isNotEmpty && !r.trial).toList()
+      ..sort((a, b) => (b.bitrate ?? 0).compareTo(a.bitrate ?? 0));
+    if (ok.isNotEmpty) {
+      return SongUrl(
+        url: ok.first.url,
+        lrc: ok.first.lrc,
+        ext: ok.first.ext,
+        bitrate: ok.first.bitrate,
+        trial: false,
+        source: ok.first.source,
+        reason: 'trial_fallback', // 所选档为试听，已自动改用完整版
+      );
+    }
+
+    // 全部为试听或失败：退回所选档（至少能导出）或默认档
+    if (chosen != null && chosen.url.isNotEmpty) return chosen;
+    return await _api.getUrl(song);
   }
 
   /// 该歌曲可选的音质档位列表（来自搜索结果的 qualityOptions），
