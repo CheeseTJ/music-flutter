@@ -94,7 +94,7 @@ Future<void> main() async {
   check('歌词获取', lrc.isNotEmpty, '空');
 
   // 5. vault 曲库可达性
-  final vault = await HttpClient().getUrl(Uri.parse('https://music-worker.2697065512-1b5.workers.dev/list'));
+  final vault = await HttpClient().getUrl(Uri.parse('https://valut.june-t.top/list'));
   final vaultResp = await vault.close();
   check('vault 曲库 /list', vaultResp.statusCode == 200, 'status=${vaultResp.statusCode}');
 
