@@ -67,7 +67,7 @@ class MusicApi {
 
   // ── helpers ──
 
-  Map<String, dynamic> _toSong(Map<String, dynamic> item) {
+  Song _toSong(Map<String, dynamic> item) {
     final extra = (item['extra'] as Map<String, dynamic>?) ?? const {};
     return Song(
       platform: (item['provider'] as String?) ?? '',
