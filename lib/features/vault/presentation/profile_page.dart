@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:open_filex/open_filex.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/network/app_update_service.dart';
 import '../../../core/network/platform_cover_service.dart';
 import '../../../core/utils/settings.dart';
 import '../../collection/providers/song_list_provider.dart';
@@ -510,29 +514,8 @@ class _AboutSection extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Version row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 20,
-                        color: PearlColors.accent(isDark)),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text('Version',
-                          style: TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w500,
-                            color: PearlColors.textPrimary(isDark),
-                          )),
-                    ),
-                    Text('1.0.0',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: PearlColors.textSecondary(isDark),
-                        )),
-                  ],
-                ),
-              ),
+              // Version + 检查更新
+              _UpdateRow(isDark: isDark),
               const SizedBox(height: 10),
               Divider(
                 height: 1,
@@ -574,6 +557,242 @@ class _AboutSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ============================================================
+//  Version + 检查更新（数据来自蒲公英，下载走国内 CDN）
+// ============================================================
+class _UpdateRow extends StatefulWidget {
+  final bool isDark;
+  const _UpdateRow({required this.isDark});
+
+  @override
+  State<_UpdateRow> createState() => _UpdateRowState();
+}
+
+class _UpdateRowState extends State<_UpdateRow> {
+  final AppUpdateService _service = AppUpdateService();
+
+  String _version = '';
+  AppUpdateInfo? _info;
+  bool _checking = false;
+  bool _downloading = false;
+  double _progress = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final pkg = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() => _version = pkg.version);
+    // 进入页面静默检查一次，有新版就直接在行内提示
+    await _check(silent: true);
+  }
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 4)),
+    );
+  }
+
+  Future<void> _check({bool silent = false}) async {
+    if (_checking || _downloading || _version.isEmpty) return;
+    setState(() => _checking = true);
+    try {
+      final info = await _service.check(_version);
+      if (!mounted) return;
+      setState(() => _info = info);
+      // 静默模式只在确实有新版本时才打扰用户
+      if (!silent || info.hasUpdate) {
+        await _showDialog(info);
+      }
+    } catch (e) {
+      if (!silent) _toast('$e');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _showDialog(AppUpdateInfo info) async {
+    if (!info.hasUpdate) {
+      _toast('已是最新版本 v${info.currentVersion}');
+      return;
+    }
+    final isDark = widget.isDark;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('发现新版本'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'v${info.currentVersion}  →  v${info.latestVersion}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            if (info.fileSizeText.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('安装包 ${info.fileSizeText}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: PearlColors.textSecondary(isDark),
+                  )),
+            ],
+            if (info.updateDescription.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(info.updateDescription, style: const TextStyle(fontSize: 13)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('稍后'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('立即更新'),
+          ),
+        ],
+      ),
+    );
+    if (go == true) await _downloadAndInstall(info);
+  }
+
+  Future<void> _downloadAndInstall(AppUpdateInfo info) async {
+    if (info.downloadUrl.isEmpty) {
+      _toast('蒲公英没有返回下载地址');
+      return;
+    }
+    setState(() {
+      _downloading = true;
+      _progress = 0;
+    });
+    try {
+      final path = await _service.download(
+        info.downloadUrl,
+        onProgress: (received, total) {
+          if (!mounted || total <= 0) return;
+          setState(() => _progress = received / total);
+        },
+      );
+      if (!mounted) return;
+      setState(() => _downloading = false);
+
+      final result = await OpenFilex.open(path);
+      if (result.type != ResultType.done) {
+        _toast('无法调起安装器：${result.message}\n'
+            '若提示签名冲突，请先卸载旧版本再安装');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _downloading = false);
+      _toast('$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final accent = PearlColors.accent(isDark);
+    final hasUpdate = _info?.hasUpdate == true;
+    final keyMissing = !AppConstants.hasPgyerKey;
+
+    Widget trailing;
+    if (_downloading) {
+      trailing = SizedBox(
+        width: 108,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(
+              value: _progress > 0 ? _progress : null,
+              minHeight: 3,
+              color: accent,
+              backgroundColor: PearlColors.bgTertiary(isDark),
+            ),
+            const SizedBox(height: 4),
+            Text('下载中 ${(_progress * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                    fontSize: 11, color: PearlColors.textSecondary(isDark))),
+          ],
+        ),
+      );
+    } else if (_checking) {
+      trailing = SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+      );
+    } else {
+      trailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasUpdate)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text('可更新 v${_info!.latestVersion}',
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600, color: accent)),
+            ),
+          Text(_version.isEmpty ? '—' : 'v$_version',
+              style: TextStyle(
+                fontSize: 14,
+                color: PearlColors.textSecondary(isDark),
+              )),
+          const SizedBox(width: 4),
+          Icon(Icons.refresh_rounded,
+              size: 16, color: PearlColors.textDisabled(isDark)),
+        ],
+      );
+    }
+
+    return InkWell(
+      onTap: (_checking || _downloading)
+          ? null
+          : () {
+              if (keyMissing) {
+                _toast('未配置蒲公英 API Key，无法检查更新');
+                return;
+              }
+              _check();
+            },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          children: [
+            Icon(
+              hasUpdate ? Icons.system_update_alt_rounded : Icons.info_outline,
+              size: 20,
+              color: accent,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text('Version',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: PearlColors.textPrimary(isDark),
+                  )),
+            ),
+            trailing,
+          ],
+        ),
+      ),
     );
   }
 }

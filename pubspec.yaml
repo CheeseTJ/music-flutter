@@ -22,6 +22,8 @@ dependencies:
   cached_network_image: ^3.4.0
   cupertino_icons: ^1.0.8
   url_launcher: ^6.3.0
+  package_info_plus: ^9.0.1
+  open_filex: ^4.7.0
 
 dev_dependencies:
   flutter_test:

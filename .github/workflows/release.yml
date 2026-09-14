@@ -31,8 +31,29 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::缺少 KEYSTORE_BASE64，会退回 debug 签名（每次构建签名都不同），导致无法覆盖安装"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          {
+            echo "storeFile=upload-keystore.jks"
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+          } > android/key.properties
+
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=PGYER_API_KEY=${{ secrets.PGYER_API_KEY }}
+
+      - name: Verify APK signature
+        run: |
+          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk \
+            | grep -E 'Owner|SHA256' || true
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk music-app-${{ github.ref_name }}.apk
