@@ -1,13 +1,17 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/pearl_colors.dart';
+import '../../../core/theme/pearl_elevation.dart';
 import '../../../core/theme/pearl_theme.dart';
 import '../../../core/utils/playback_history.dart';
 import '../../../core/utils/settings.dart';
+import '../../../core/widgets/pearl_anchored_menu.dart';
 import '../../../core/widgets/pearl_bottom_sheet.dart';
+import '../../../core/widgets/pearl_toast.dart';
 import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
@@ -25,6 +29,7 @@ class CollectionPage extends ConsumerStatefulWidget {
 class _CollectionPageState extends ConsumerState<CollectionPage> {
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _filterBtnKey = GlobalKey();
   bool _refreshing = false;
   FilterOption _filter = FilterOption.all;
   String _greetingText = '';
@@ -48,6 +53,41 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  /// 右上角筛选入口：玻璃锚定菜单，展开在按钮正下方
+  Future<void> _openFilterMenu() async {
+    final anchorContext = _filterBtnKey.currentContext;
+    if (anchorContext == null) return;
+    final picked = await showPearlMenu<FilterOption>(
+      context: context,
+      anchorContext: anchorContext,
+      selected: _filter,
+      entries: const [
+        PearlMenuEntry(
+            value: FilterOption.all,
+            label: '默认',
+            icon: Icons.format_list_bulleted_rounded),
+        PearlMenuEntry(
+            value: FilterOption.noLyric,
+            label: '缺歌词',
+            icon: Icons.lyrics_outlined),
+        PearlMenuEntry(
+            value: FilterOption.duplicates,
+            label: '重名筛查',
+            icon: Icons.content_copy_rounded),
+        PearlMenuEntry(
+            value: FilterOption.sortByName,
+            label: '按名称排序',
+            icon: Icons.sort_by_alpha_rounded),
+        PearlMenuEntry(
+            value: FilterOption.recent,
+            label: '最近添加',
+            icon: Icons.access_time_rounded),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    setState(() => _filter = picked);
   }
 
   void _updateGreeting() {
@@ -274,38 +314,26 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 ],
               ),
               const Spacer(),
-              // Filter popup — same visual style as the search page's
-              // source/platform dropdowns (rounded square icon, 12-radius
-              // menu, 6px offset, soft shadow).
-              PopupMenuButton<FilterOption>(
-                tooltip: '',
-                position: PopupMenuPosition.under,
-                offset: const Offset(0, 6),
-                elevation: 8,
-                color: PearlColors.bgSecondary(isDark),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                onSelected: (f) => setState(() => _filter = f),
-                itemBuilder: (_) => [
-                  _buildFilterItem(context, '默认', FilterOption.all, Icons.format_list_bulleted_rounded, isDark),
-                  _buildFilterItem(context, '缺歌词', FilterOption.noLyric, Icons.lyrics_outlined, isDark),
-                  _buildFilterItem(context, '重名筛查', FilterOption.duplicates, Icons.content_copy_rounded, isDark),
-                  _buildFilterItem(context, '按名称排序', FilterOption.sortByName, Icons.sort_by_alpha_rounded, isDark),
-                  _buildFilterItem(context, '最近添加', FilterOption.recent, Icons.access_time_rounded, isDark),
-                ],
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: _hasActiveFilter
-                        ? PearlColors.accent(isDark).withValues(alpha: 0.15)
-                        : PearlColors.glassBg(isDark),
+              // 筛选入口：玻璃锚定菜单（core/widgets/pearl_anchored_menu.dart），
+              // 不再用 PopupMenuButton 的实心面板 + M3 elevation 8。
+              SizedBox(
+                key: _filterBtnKey,
+                width: 38,
+                height: 38,
+                child: Material(
+                  color: _hasActiveFilter
+                      ? PearlColors.accent(isDark).withValues(alpha: 0.15)
+                      : PearlElevation.fill(PearlLayer.inset, isDark),
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(10),
+                    onTap: _openFilterMenu,
+                    child: Icon(Icons.filter_list_rounded,
+                        size: 18,
+                        color: _hasActiveFilter
+                            ? PearlColors.accent(isDark)
+                            : PearlColors.textSecondary(isDark)),
                   ),
-                  child: Icon(Icons.filter_list_rounded,
-                      size: 18,
-                      color: _hasActiveFilter
-                          ? PearlColors.accent(isDark)
-                          : PearlColors.textSecondary(isDark)),
                 ),
               ),
             ],
@@ -435,6 +463,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                             context.push('/player', extra: song);
                           },
                           onLongPress: () => _showSongMenu(context, ref, song),
+                          onPlayPause: () =>
+                              ref.read(playerProvider.notifier).togglePlayPause(),
+                          onMore: () => _showSongMenu(context, ref, song),
                         ),
                       );
                     },
@@ -464,32 +495,6 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     ],
     );
   }
-
-  PopupMenuItem<FilterOption> _buildFilterItem(BuildContext context, String label, FilterOption value, IconData icon, bool isDark) {
-    final selected = _filter == value;
-    return PopupMenuItem<FilterOption>(
-      height: 40,
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: selected
-              ? PearlColors.accent(isDark)
-              : PearlColors.textSecondary(isDark)),
-          const SizedBox(width: 10),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 14,
-                  color: selected
-                      ? PearlColors.accent(isDark)
-                      : PearlColors.textPrimary(isDark),
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
-          const Spacer(),
-          if (selected) Icon(Icons.check_rounded, size: 18,
-              color: PearlColors.accent(isDark)),
-        ],
-      ),
-    );
-  }
 }
 
 void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
@@ -500,77 +505,103 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
   showPearlBottomSheet(
     context: context,
     builder: (ctx) {
-      final hasSong = ref.read(playerProvider.notifier).currentSong != null;
-      final extraBottom = (72 + 20 + (hasSong ? 68 + 8 : 0)).toDouble();
-      return Container(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, extraBottom),
-        decoration: BoxDecoration(
-          color: PearlColors.glassBgStrong(isDark),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(PearlElevation.sheetRadius),
         ),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(width: 40, height: 4,
-                  decoration: BoxDecoration(color: PearlColors.textDisabled(isDark), borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  if (song.type == 'netease')
-                    SvgPicture.asset('assets/icons/\u7f51\u6613\u4e91\u97f3\u4e50.svg', width: 20, height: 20)
-                  else if (song.type == 'qq')
-                    SvgPicture.asset('assets/icons/QQ\u97f3\u4e50.svg', width: 20, height: 20),
-                  if (song.type.isNotEmpty) const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(song.title,
-                        style: TextStyle(color: PearlColors.textPrimary(isDark), fontSize: 17, fontWeight: FontWeight.w600)),
-                  ),
-                ],
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+          child: Container(
+            // 面板直接贴到屏幕底。之前额外留了 tab bar + 迷你播放器的高度，
+            // 但遮罩已经把底栏压暗了，那截留白只让下部空出一块，没有意义。
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            decoration: BoxDecoration(
+              color: PearlElevation.fill(PearlLayer.overlay, isDark),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(PearlElevation.sheetRadius),
               ),
-              const SizedBox(height: 4),
-              Text('${song.artist} · ${song.durationFormatted}',
-                  style: TextStyle(color: PearlColors.textSecondary(isDark), fontSize: 13)),
-              const SizedBox(height: 16),
-              if (isCurrentSong)
-                _MenuTile(
-                  icon: notifier.player.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  label: notifier.player.playing ? '暂停' : '播放',
-                  color: PearlColors.accent(isDark),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    notifier.togglePlayPause();
-                  },
+              border: Border(
+                top: BorderSide(
+                  color: PearlElevation.border(PearlLayer.overlay, isDark),
                 ),
-              if (!song.hasLyric)
-                _MenuTile(
-                  icon: Icons.lyrics_outlined,
-                  label: '上传歌词',
-                  color: PearlColors.accent(isDark),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                  },
-                ),
-              _MenuTile(
-                icon: Icons.delete_outline_rounded,
-                label: '删除歌曲',
-                color: const Color(0xFFFF7A9E),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  try {
-                    await ref.read(songListProvider.notifier).removeSong(song.id);
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('删除失败: $e')));
-                    }
-                  }
-                },
               ),
-              const SizedBox(height: 8),
-            ],
-          ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: PearlColors.textDisabled(isDark),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        if (song.type == 'netease')
+                          SvgPicture.asset('assets/icons/网易云音乐.svg', width: 20, height: 20)
+                        else if (song.type == 'qq')
+                          SvgPicture.asset('assets/icons/QQ音乐.svg', width: 20, height: 20),
+                        if (song.type.isNotEmpty) const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(song.title,
+                              style: TextStyle(
+                                  color: PearlColors.textPrimary(isDark),
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('${song.artist} · ${song.durationFormatted}',
+                        style: TextStyle(
+                            color: PearlColors.textSecondary(isDark), fontSize: 13)),
+                    const SizedBox(height: 16),
+                    if (isCurrentSong)
+                      _MenuTile(
+                        icon: notifier.player.playing
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        label: notifier.player.playing ? '暂停' : '播放',
+                        color: PearlColors.accent(isDark),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          notifier.togglePlayPause();
+                        },
+                      ),
+                    if (!song.hasLyric)
+                      _MenuTile(
+                        icon: Icons.lyrics_outlined,
+                        label: '上传歌词',
+                        color: PearlColors.accent(isDark),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                    _MenuTile(
+                      icon: Icons.delete_outline_rounded,
+                      label: '删除歌曲',
+                      color: const Color(0xFFFF7A9E),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        try {
+                          await ref.read(songListProvider.notifier).removeSong(song.id);
+                        } catch (e) {
+                          if (context.mounted) {
+                            PearlToast.error(context, '删除失败: $e');
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       );

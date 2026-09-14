@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/animation/pearl_motion.dart';
 import '../../../core/theme/pearl_colors.dart';
+import '../../../core/theme/pearl_elevation.dart';
 import '../../../core/theme/pearl_theme.dart';
 import '../../../core/utils/color_extractor.dart';
 import '../../../core/widgets/pearl_bottom_sheet.dart';
@@ -819,14 +820,26 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
   showPearlBottomSheet(
     context: context,
     builder: (ctx) {
-      final bottomInset = MediaQuery.of(ctx).padding.bottom;
-      return Container(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-        decoration: BoxDecoration(
-          color: PearlColors.glassBgStrong(isDark),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      return ClipRRect(
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(PearlElevation.sheetRadius),
         ),
-        child: SafeArea(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            decoration: BoxDecoration(
+              color: PearlElevation.fill(PearlLayer.overlay, isDark),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(PearlElevation.sheetRadius),
+              ),
+              border: Border(
+                top: BorderSide(
+                  color: PearlElevation.border(PearlLayer.overlay, isDark),
+                ),
+              ),
+            ),
+            child: SafeArea(
           top: false,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -930,6 +943,8 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
                       ),
               ),
             ],
+              ),
+            ),
           ),
         ),
       );

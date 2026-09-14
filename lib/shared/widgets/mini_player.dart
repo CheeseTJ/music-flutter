@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/pearl_colors.dart';
+import '../../core/theme/pearl_elevation.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
 import '../../features/player/providers/player_provider.dart';
@@ -38,71 +39,79 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
       onTap: () => context.push('/player', extra: song),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-            child: Container(
-              height: 68,
-              decoration: BoxDecoration(
-                color: PearlColors.glassBg(isDark),
-                borderRadius: BorderRadius.circular(28),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: _coverUrl != null
-                        ? Image.network(
-                            _coverUrl!,
-                            width: 48,
-                            height: 48,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _musicIcon(isDark),
-                          )
-                        : _musicIcon(isDark),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          song.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: PearlColors.textPrimary(isDark),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          song.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: PearlColors.textSecondary(isDark),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+        child: Container(
+          // 阴影画在 ClipRRect 之外，否则会被裁掉（浮层用同一套表面令牌）
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(PearlElevation.radius(PearlLayer.float)),
+            boxShadow: PearlElevation.shadow(PearlLayer.float, isDark),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(PearlElevation.radius(PearlLayer.float)),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+              child: Container(
+                height: 68,
+                decoration: BoxDecoration(
+                  color: PearlElevation.fill(PearlLayer.float, isDark),
+                  borderRadius: BorderRadius.circular(PearlElevation.radius(PearlLayer.float)),
+                  border: PearlElevation.outline(PearlLayer.float, isDark),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: _coverUrl != null
+                          ? Image.network(
+                              _coverUrl!,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _musicIcon(isDark),
+                            )
+                          : _musicIcon(isDark),
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      isPlaying
-                          ? Icons.pause_circle_filled_rounded
-                          : Icons.play_circle_fill_rounded,
-                      size: 36,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            song.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: PearlColors.textPrimary(isDark),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            song.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: PearlColors.textSecondary(isDark),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    color: PearlColors.accent(isDark),
-                    onPressed: () => notifier.togglePlayPause(),
-                  ),
-                ],
+                    IconButton(
+                      icon: Icon(
+                        isPlaying
+                            ? Icons.pause_circle_filled_rounded
+                            : Icons.play_circle_fill_rounded,
+                        size: 36,
+                      ),
+                      color: PearlColors.accent(isDark),
+                      onPressed: () => notifier.togglePlayPause(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

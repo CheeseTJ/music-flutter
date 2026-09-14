@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/pearl_colors.dart';
+import 'pearl_toast.dart';
 import '../../core/crypto/kgm.dart';
 import '../../data/datasources/remote/api_client.dart';
 import '../../features/collection/providers/song_list_provider.dart';
@@ -55,7 +56,6 @@ class UploadButton extends ConsumerWidget {
     if (result == null || result.files.isEmpty) return;
     if (!context.mounted) return;
 
-    final scaffold = ScaffoldMessenger.of(context);
     final api = ref.read(apiClientProvider);
     final songListCtrl = ref.read(songListProvider.notifier);
 
@@ -85,20 +85,17 @@ class UploadButton extends ConsumerWidget {
     }
 
     await songListCtrl.load();
+    if (!context.mounted) return;
 
     if (success > 0) {
-      scaffold.showSnackBar(
-        SnackBar(
-          content: Text('Imported $success file${success == 1 ? '' : 's'}${failed > 0 ? ' ($failed failed)' : ''}'),
-          backgroundColor: const Color(0xFF2E7D32),
-        ),
+      PearlToast.success(
+        context,
+        'Imported $success file${success == 1 ? '' : 's'}${failed > 0 ? ' ($failed failed)' : ''}',
       );
     } else if (failed > 0) {
-      scaffold.showSnackBar(
-        SnackBar(
-          content: Text('Import failed for $failed file${failed == 1 ? '' : 's'}'),
-          backgroundColor: Colors.redAccent,
-        ),
+      PearlToast.error(
+        context,
+        'Import failed for $failed file${failed == 1 ? '' : 's'}',
       );
     }
   }

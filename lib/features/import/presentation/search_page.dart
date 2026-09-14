@@ -17,6 +17,7 @@ import 'package:music_app/features/import/music_manager.dart';
 import 'package:music_app/data/datasources/remote/api_client.dart';
 import 'package:music_app/data/models/song.dart' as local_song;
 import 'package:music_app/core/utils/settings.dart';
+import 'package:music_app/core/widgets/pearl_toast.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
 
 
@@ -284,9 +285,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       final url = await mgr.getBestUrl(song);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('\u83b7\u53d6\u64ad\u653e\u94fe\u63a5\u5931\u8d25'), backgroundColor: Colors.redAccent),
-          );
+          PearlToast.error(context, '\u83b7\u53d6\u64ad\u653e\u94fe\u63a5\u5931\u8d25');
         }
         return;
       }
@@ -296,12 +295,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           platform: song.platform, id: song.id, lyric: lrc.isEmpty ? null : lrc);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('\u64ad\u653e\u5931\u8d25: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        PearlToast.error(context, '\u64ad\u653e\u5931\u8d25: $e');
       }
     }
   }
@@ -390,9 +384,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       final url = await mgr.getUrlForImport(song, quality);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('\u83b7\u53d6\u4e0b\u8f7d\u94fe\u63a5\u5931\u8d25'), backgroundColor: Colors.redAccent),
-          );
+          PearlToast.error(context, '\u83b7\u53d6\u4e0b\u8f7d\u94fe\u63a5\u5931\u8d25');
         }
         return;
       }
@@ -405,15 +397,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 
       // 提示：所选档为 30s 试听，已自动改用完整版（或全部试听时保留试听）
       if (url.trial && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${song.name} 仅提供试听片段（30s）'),
-              backgroundColor: const Color(0xFFB26A00)),
-        );
+        PearlToast.warning(context, '${song.name} 仅提供试听片段（30s）');
       } else if (url.reason == 'trial_fallback' && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('所选音质为试听片段，已自动改用完整版（${(url.bitrate ?? 0)}kbps）'),
-              backgroundColor: const Color(0xFF2E7D32)),
-        );
+        PearlToast.success(
+            context, '所选音质为试听片段，已自动改用完整版（${(url.bitrate ?? 0)}kbps）');
       }
 
       // 走现有的本地上传逻辑
@@ -442,15 +429,11 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
         ref.read(songListProvider.notifier).load();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${song.name} \u5df2\u6dfb\u52a0\u5230\u66f2\u5e93'), backgroundColor: const Color(0xFF2E7D32)),
-        );
+        PearlToast.success(context, '${song.name} \u5df2\u6dfb\u52a0\u5230\u66f2\u5e93');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('\u5bfc\u5165\u5931\u8d25: $e'), backgroundColor: Colors.redAccent),
-        );
+        PearlToast.error(context, '\u5bfc\u5165\u5931\u8d25: $e');
       }
     } finally {
       if (mounted) {
@@ -759,7 +742,6 @@ class _ResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final badgeColor = MusicPlatformMeta.color(song.platform, isDark);
     final accentColor = PearlColors.accent(isDark);
-    final platformIcon = MusicPlatformMeta.iconCached(song.platform, 22);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -780,21 +762,43 @@ class _ResultTile extends StatelessWidget {
                       future: coverFuture,
                       builder: (_, snap) {
                         final hasCover = snap.hasData && snap.data != null;
-                        return Container(
-                          width: 48, height: 48,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
+                        return SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Stack(
+                            // 角标会探出封面一点点，所以这一层不能裁
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned.fill(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: hasCover
+                                      ? Image.network(
+                                          snap.data!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              _placeholderIcon(badgeColor, Icons.music_note_rounded),
+                                        )
+                                      : _placeholderIcon(badgeColor, Icons.music_note_rounded),
+                                ),
+                              ),
+                              // 来源是只读属性，做成封面角标，不再和播放/下载挤在一行
+                              Positioned(
+                                left: -3,
+                                bottom: -3,
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: PearlColors.bgPrimary(isDark),
+                                    borderRadius: BorderRadius.circular(7),
+                                  ),
+                                  child: MusicPlatformMeta.iconCached(song.platform, 14),
+                                ),
+                              ),
+                            ],
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: hasCover
-                              ? Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Image.network(snap.data!, fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => _placeholderIcon(badgeColor, Icons.music_note_rounded)),
-                                  ],
-                                )
-                              : _placeholderIcon(badgeColor, Icons.music_note_rounded),
                         );
                       },
                     ),
@@ -804,23 +808,15 @@ class _ResultTile extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  song.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: PearlColors.textPrimary(isDark),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              platformIcon,
-                            ],
+                          Text(
+                            song.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: PearlColors.textPrimary(isDark),
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(

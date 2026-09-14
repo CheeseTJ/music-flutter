@@ -14,6 +14,12 @@ class SongTile extends ConsumerStatefulWidget {
   final bool isPlaying;
   final bool isPaused;
 
+  /// 当前曲目的播放/暂停按钮；为 null 时不渲染这个按钮
+  final VoidCallback? onPlayPause;
+
+  /// 右侧「更多」按钮；为 null 时不渲染这个按钮
+  final VoidCallback? onMore;
+
   const SongTile({
     super.key,
     required this.song,
@@ -21,6 +27,8 @@ class SongTile extends ConsumerStatefulWidget {
     this.onLongPress,
     this.isPlaying = false,
     this.isPaused = false,
+    this.onPlayPause,
+    this.onMore,
   });
 
   @override
@@ -96,6 +104,7 @@ class _SongTileState extends ConsumerState<SongTile>
         : PearlColors.textPrimary(isDark);
     final textS = PearlColors.textSecondary(isDark);
     final textD = PearlColors.textDisabled(isDark);
+    final accent = PearlColors.accent(isDark);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
@@ -154,19 +163,26 @@ class _SongTileState extends ConsumerState<SongTile>
                     ],
                   ),
                 ),
-                if (isCurrentPlaying)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Icon(
-                      isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                      size: 18,
-                      color: PearlColors.accent(isDark),
-                    ),
-                  ),
                 if (!widget.song.hasLyric)
-                  Icon(Icons.lyrics_outlined, size: 13, color: textD),
-                const SizedBox(width: 6),
-                Icon(Icons.more_horiz_rounded, size: 15, color: textD),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(Icons.lyrics_outlined, size: 14, color: textD),
+                  ),
+                // 播放/暂停：只有当前曲目才有意义，就地 toggle
+                if (isCurrentPlaying && widget.onPlayPause != null)
+                  _TileIconButton(
+                    icon: isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                    color: accent,
+                    background: accent.withValues(alpha: 0.12),
+                    onTap: widget.onPlayPause,
+                  ),
+                // 更多：打开操作面板
+                if (widget.onMore != null)
+                  _TileIconButton(
+                    icon: Icons.more_horiz_rounded,
+                    color: textS,
+                    onTap: widget.onMore,
+                  ),
               ],
             ),
           ),
@@ -236,6 +252,51 @@ class _SongTileState extends ConsumerState<SongTile>
       ),
       child: Center(
         child: Icon(Icons.music_note_rounded, size: 24, color: accent.withValues(alpha: 0.5)),
+      ),
+    );
+  }
+}
+
+/// 歌曲行右侧的图标按钮：触摸区 36×36，视觉方块 32×32。
+///
+/// 之前这里的播放/暂停与「更多」只是两个 15~18px 的裸 [Icon]，既小又不可点
+/// （整行只有一个 InkWell，点它们等于点整行）。现在改成真正的按钮，
+/// 规格与搜索页 `_ResultTile` 的按钮对齐。
+class _TileIconButton extends StatelessWidget {
+  const _TileIconButton({
+    required this.icon,
+    required this.onTap,
+    required this.color,
+    this.background,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color color;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Center(
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 19, color: color),
+            ),
+          ),
+        ),
       ),
     );
   }

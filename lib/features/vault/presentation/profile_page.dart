@@ -12,6 +12,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/network/app_update_service.dart';
 import '../../../core/network/platform_cover_service.dart';
 import '../../../core/utils/settings.dart';
+import '../../../core/widgets/pearl_toast.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
 
@@ -380,9 +381,7 @@ class _ClearCacheRowState extends State<_ClearCacheRow> {
     if (!mounted) return;
     setState(() => _clearing = false);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('封面缓存已清空'), duration: Duration(seconds: 1)),
-      );
+      PearlToast.show(context, '封面缓存已清空', duration: const Duration(seconds: 2));
     }
   }
 
@@ -599,11 +598,9 @@ class _UpdateRowState extends State<_UpdateRow> {
     await _check(silent: true);
   }
 
-  void _toast(String msg) {
+  void _toast(String msg, {PearlToastType type = PearlToastType.info}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 4)),
-    );
+    PearlToast.show(context, msg, type: type, duration: const Duration(seconds: 4));
   }
 
   /// 返回是否成功拿到结果。silent 时不打扰用户，只更新行内徽标。
@@ -616,7 +613,7 @@ class _UpdateRowState extends State<_UpdateRow> {
       setState(() => _info = info);
       return true;
     } catch (e) {
-      if (!silent && mounted) _toast('$e');
+      if (!silent && mounted) _toast('$e', type: PearlToastType.error);
       return false;
     } finally {
       if (mounted) setState(() => _checking = false);
@@ -627,7 +624,7 @@ class _UpdateRowState extends State<_UpdateRow> {
   Future<void> _onTapRow() async {
     if (_checking || _downloading) return;
     if (!AppConstants.hasPgyerKey) {
-      _toast('未配置蒲公英 API Key，无法检查更新');
+      _toast('未配置蒲公英 API Key，无法检查更新', type: PearlToastType.warning);
       return;
     }
     if (_expanded) {
@@ -643,7 +640,7 @@ class _UpdateRowState extends State<_UpdateRow> {
     if (_hasUpdate) {
       setState(() => _expanded = true);
     } else {
-      _toast('已是最新版本 v$_version');
+      _toast('已是最新版本 v$_version', type: PearlToastType.success);
     }
   }
 
@@ -651,7 +648,7 @@ class _UpdateRowState extends State<_UpdateRow> {
     final info = _info;
     if (info == null) return;
     if (info.downloadUrl.isEmpty) {
-      _toast('蒲公英没有返回下载地址');
+      _toast('蒲公英没有返回下载地址', type: PearlToastType.error);
       return;
     }
     setState(() {
@@ -675,11 +672,11 @@ class _UpdateRowState extends State<_UpdateRow> {
       final result = await OpenFilex.open(path);
       if (result.type != ResultType.done) {
         _toast('无法调起安装器：${result.message}\n'
-            '若提示签名冲突，请先卸载旧版本再安装');
+            '若提示签名冲突，请先卸载旧版本再安装', type: PearlToastType.warning);
       }
     } catch (e) {
       if (mounted) setState(() => _downloading = false);
-      _toast('$e');
+      _toast('$e', type: PearlToastType.error);
     }
   }
 
