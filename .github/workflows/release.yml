@@ -52,8 +52,14 @@ jobs:
 
       - name: Verify APK signature
         run: |
-          keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk \
-            | grep -E 'Owner|SHA256' || true
+          # 注意：keytool -printcert -jarfile 只能读 v1(JAR) 签名，
+          # 本项目 minSdk=24，AGP 默认只出 v2 签名，用它取不到证书。
+          APKSIGNER="$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::warning::未找到 apksigner，跳过签名校验"
+            exit 0
+          fi
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk music-app-${{ github.ref_name }}.apk
