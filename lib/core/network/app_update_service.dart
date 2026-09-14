@@ -69,6 +69,9 @@ class AppUpdateService {
           'appKey': AppConstants.pgyerAppKey,
           'buildVersion': currentVersion,
         },
+        // 蒲公英只解析 form-urlencoded。dio 传 Map 时默认按 JSON 发出，
+        // 服务端读不到字段会直接报 code=1001「_api_key could not be empty」。
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
     } on DioException catch (e) {
       throw AppUpdateException('检查更新失败：${e.message ?? e.type.name}');
