@@ -148,8 +148,12 @@ class PlayerController extends StateNotifier<PlayerState> {
   Future<void> load(Song song) async {
     try {
       await _loadSongInternal(song);
-      state = state.copyWith(phase: PlayerPhase.paused);
+      // 先挂监听：playingStream 订阅后会立即推送当前值，能把状态拉回真实值
       _wirePlayerStreams();
+      // 加载期间用户可能已经点了播放，此时不能再无条件改回暂停
+      if (!_handler.playing) {
+        state = state.copyWith(phase: PlayerPhase.paused);
+      }
       _fetchLyric(song.id);
     } catch (e) {
       state = state.copyWith(phase: PlayerPhase.error);
@@ -213,8 +217,14 @@ class PlayerController extends StateNotifier<PlayerState> {
     _playingSub?.cancel();
     _positionSub = _handler.player.positionStream.listen(_onPositionChanged);
     _durationSub = _handler.player.durationStream.listen((_) {});
+    // 双向同步：图标必须跟随真实播放状态。
+    // 只处理「停止」方向的话，phase 一旦被写错就再也纠正不回来。
     _playingSub = _handler.player.playingStream.listen((playing) {
-      if (!playing && state.isPlaying) {
+      if (playing) {
+        if (state.phase != PlayerPhase.playing) {
+          state = state.copyWith(phase: PlayerPhase.playing);
+        }
+      } else if (state.isPlaying) {
         state = state.copyWith(phase: PlayerPhase.paused);
       }
     });
