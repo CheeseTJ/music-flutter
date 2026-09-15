@@ -276,9 +276,13 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     final songsAsync = ref.watch(songListProvider);
     final songs = songsAsync.valueOrNull;
     final filtered = songs != null ? _applyFilter(songs) : const <LocalSong>[];
-    final playerState = ref.watch(playerProvider);
-    final currentSong = ref.watch(playerProvider.notifier).currentSong;
-    final hasSong = currentSong != null;
+    // 只订阅真正影响列表的三样东西。之前是 ref.watch(playerProvider) 整个
+    // state，于是歌词加载完成、播放模式切换这类跟列表无关的变化也会把整页
+    // （含所有可见行）重建一遍。
+    final (currentSongId, playingUrlId, playerPhase) = ref.watch(
+      playerProvider.select((v) => (v.currentSongId, v.playingUrlId, v.phase)),
+    );
+    final hasSong = currentSongId != null || playingUrlId != null;
     final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -286,9 +290,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
     // 过滤结果和「当前曲目在列表里的下标」都只在这里算一次。
     // 滚动监听器（每帧触发）只做算术，不再遍历歌单。
-    _currentIdx = currentSong == null
+    _currentIdx = currentSongId == null
         ? -1
-        : filtered.indexWhere((s) => s.id == currentSong.id);
+        : filtered.indexWhere((s) => s.id == currentSongId);
     // 切歌 / 换筛选后同步一次可见性，替代之前每次 build 都挂一个
     // postFrameCallback 去重复检测。
     final currentVisible = _isCurrentVisible();
@@ -459,13 +463,13 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
                       final song = filtered[i];
-                      final isCurrent = currentSong?.id == song.id;
+                      final isCurrent = currentSongId == song.id;
                       return RepaintBoundary(
                         child: SongTile(
                           key: ValueKey(song.id),
                           song: song,
                           isPlaying: isCurrent,
-                          isPaused: playerState.phase == PlayerPhase.paused,
+                          isPaused: playerPhase == PlayerPhase.paused,
                           onTap: () {
                             ref.read(playerProvider.notifier).setPlaylist(songs);
                             context.push('/player', extra: song);
@@ -492,7 +496,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                 duration: const Duration(milliseconds: 300),
                 child: _LocateButton(
                   scrollCtrl: _scrollCtrl,
-                  targetId: currentSong.id,
+                  // 这个分支已经保证 _currentIdx >= 0，即它就是当前曲目在
+                  // filtered 里的下标
+                  targetId: filtered[_currentIdx].id,
                   filtered: filtered,
                 ),
               ),

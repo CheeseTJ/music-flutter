@@ -30,7 +30,24 @@ class PlayerState {
   /// —— 表现为「点了 B，A 还在转圈」。
   final String? playingUrlId;
 
-  const PlayerState(this.phase, {this.playMode = 0, this.lyricLoading = false, this.lyricFailed = false, this.playingUrlId});
+  /// 当前本地曲目的 id（在线播放时为 null）。
+  ///
+  /// 和 [playingUrlId] 一样是给界面用的：首页靠它决定哪一行高亮，而且它必须
+  /// 在 state 里 —— 连着点两首本地歌时 phase 不变（loading → loading），
+  /// 只改 controller 上的 _currentSong 不会触发重建。
+  ///
+  /// 在线播放时留 null：平台曲目 id 和本地 id 是两套编号，混在一起会让首页
+  /// 误判成「正在播这首本地歌」。
+  final int? currentSongId;
+
+  const PlayerState(
+    this.phase, {
+    this.playMode = 0,
+    this.lyricLoading = false,
+    this.lyricFailed = false,
+    this.playingUrlId,
+    this.currentSongId,
+  });
   PlayerState copyWith({
     PlayerPhase? phase,
     int? playMode,
@@ -38,6 +55,8 @@ class PlayerState {
     bool? lyricFailed,
     String? playingUrlId,
     bool clearPlayingUrlId = false,
+    int? currentSongId,
+    bool clearCurrentSongId = false,
   }) =>
       PlayerState(
         phase ?? this.phase,
@@ -45,6 +64,8 @@ class PlayerState {
         lyricLoading: lyricLoading ?? this.lyricLoading,
         lyricFailed: lyricFailed ?? this.lyricFailed,
         playingUrlId: clearPlayingUrlId ? null : (playingUrlId ?? this.playingUrlId),
+        currentSongId:
+            clearCurrentSongId ? null : (currentSongId ?? this.currentSongId),
       );
   factory PlayerState.idle() => const PlayerState(PlayerPhase.idle);
   factory PlayerState.loading() => const PlayerState(PlayerPhase.loading);
@@ -233,7 +254,11 @@ class PlayerController extends StateNotifier<PlayerState> {
     _currentSong = song;
     _lyric = null;
     _currentLyricIndex = -1;
-    state = state.copyWith(phase: PlayerPhase.loading, clearPlayingUrlId: true);
+    state = state.copyWith(
+      phase: PlayerPhase.loading,
+      clearPlayingUrlId: true,
+      currentSongId: song.id,
+    );
 
     final data = await _apiClient.getPlayUrl(song.id);
     if (!isCurrentLoad(seq)) return;
@@ -458,6 +483,8 @@ class PlayerController extends StateNotifier<PlayerState> {
       lyricFailed: false,
       playingUrlId: urlId,
       clearPlayingUrlId: urlId == null,
+      // 在线曲目的 id 来自平台，和本地曲库不是一套编号
+      clearCurrentSongId: true,
     );
     return seq;
   }

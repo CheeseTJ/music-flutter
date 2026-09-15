@@ -66,17 +66,21 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
     setState(() => _records = []);
   }
 
-  LocalSong? _toSong(PlayRecord r, List<LocalSong> songList) {
-    return songList.cast<LocalSong?>().firstWhere(
-      (s) => s?.id == r.songId,
-      orElse: () => null,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final songList = ref.watch(songListProvider).valueOrNull ?? [];
+
+    // 记录 → 歌曲的解析只在 build 里做一次。
+    // 之前这一步放在 itemBuilder 里对全表 firstWhere：每建一行就扫一遍歌单，
+    // 快速滚动时一帧要建好几行，整体是 O(行数 × 歌单)。换成先建索引再查，
+    // 每行只剩 O(1)，同时顺手把「歌已从曲库删掉」的记录过滤掉（以前是渲染成
+    // 一个零高度的 SizedBox 占位）。
+    final songById = <int, LocalSong>{for (final s in songList) s.id: s};
+    final rows = <({PlayRecord record, LocalSong song})>[
+      for (final r in _records)
+        if (songById[r.songId] != null) (record: r, song: songById[r.songId]!),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -95,7 +99,7 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
               child: PearlLoading(
                   size: 36, strokeWidth: 4, color: PearlColors.accent(isDark)),
             )
-          : _records.isEmpty
+          : rows.isEmpty
               ? PearlEmptyState(
                   isDark: isDark,
                   icon: Icons.history_rounded,
@@ -104,17 +108,18 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 16),
-                  itemCount: _records.length,
+                  itemCount: rows.length,
                   itemBuilder: (ctx, i) {
-                    final r = _records[i];
-                    final song = _toSong(r, songList);
-                    if (song == null) return const SizedBox.shrink();
-                    return SongTile(
-                      key: ValueKey('history_${r.songId}_${r.playedAt}'),
-                      song: song,
-                      onTap: () {
-                        context.push('/player', extra: song);
-                      },
+                    final row = rows[i];
+                    return RepaintBoundary(
+                      child: SongTile(
+                        key: ValueKey(
+                            'history_${row.record.songId}_${row.record.playedAt}'),
+                        song: row.song,
+                        onTap: () {
+                          context.push('/player', extra: row.song);
+                        },
+                      ),
                     );
                   },
                 ),

@@ -1,14 +1,13 @@
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_theme.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
 import 'pearl_cover.dart';
 
-class SongTile extends ConsumerStatefulWidget {
+class SongTile extends StatefulWidget {
   final LocalSong song;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -33,16 +32,12 @@ class SongTile extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SongTile> createState() => _SongTileState();
+  State<SongTile> createState() => _SongTileState();
 }
 
-class _SongTileState extends ConsumerState<SongTile>
-    with AutomaticKeepAliveClientMixin {
+class _SongTileState extends State<SongTile> {
   String? _coverUrl;
   int? _lastSongId;
-
-  @override
-  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -95,7 +90,6 @@ class _SongTileState extends ConsumerState<SongTile>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isCurrentPlaying = widget.isPlaying;
     final isPaused = widget.isPaused;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/pearl_theme.dart';
+import 'core/theme/pearl_scroll_behavior.dart';
 import 'core/router/app_router.dart';
 import 'core/audio/audio_player_handler.dart';
 import 'core/audio/notification_service.dart';
@@ -88,6 +89,8 @@ class _MusicAppState extends ConsumerState<MusicApp> {
       theme: PearlTheme.get(Brightness.light),
       darkTheme: PearlTheme.get(Brightness.dark),
       themeMode: ThemeMode.system,
+      // 全局换成 iOS 的滚动手感：橡皮筋回弹 + 干掉 overscroll 拉伸指示器
+      scrollBehavior: const PearlScrollBehavior(),
       locale: Locale(lang == AppLang.en ? 'en' : 'zh'),
       supportedLocales: const [Locale('zh'), Locale('en')],
       // Material 自己的内置文案（对话框按钮、tooltip 等）也要跟着切
