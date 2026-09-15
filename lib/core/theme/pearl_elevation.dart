@@ -39,7 +39,7 @@ class PearlElevation {
       case PearlLayer.nav:
         return isDark ? const Color(0x1CFFFFFF) : const Color(0xE6FFFFFF);
       case PearlLayer.overlay:
-        return isDark ? const Color(0x20FFFFFF) : const Color(0xEEFFFFFF);
+        return isDark ? const Color(0x29FFFFFF) : const Color(0xF7FFFFFF);
     }
   }
 
@@ -54,7 +54,7 @@ class PearlElevation {
         case PearlLayer.nav:
           return Colors.white.withValues(alpha: 0.14);
         case PearlLayer.overlay:
-          return Colors.white.withValues(alpha: 0.16);
+          return Colors.white.withValues(alpha: 0.20);
       }
     }
     switch (layer) {
@@ -65,7 +65,7 @@ class PearlElevation {
       case PearlLayer.nav:
         return Colors.black.withValues(alpha: 0.08);
       case PearlLayer.overlay:
-        return Colors.black.withValues(alpha: 0.09);
+        return Colors.black.withValues(alpha: 0.12);
     }
   }
 
@@ -110,13 +110,13 @@ class PearlElevation {
         case PearlLayer.overlay:
           return [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.18),
+              color: Colors.black.withValues(alpha: 0.22),
               blurRadius: 44,
               offset: const Offset(0, 18),
               spreadRadius: -12,
             ),
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withValues(alpha: 0.10),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),

@@ -125,7 +125,7 @@ class _PearlToastViewState extends State<_PearlToastView>
       reverseCurve: PearlMotion.accelerate,
     );
     _slide = Tween<Offset>(
-      begin: const Offset(0, -0.4),
+      begin: const Offset(0, -0.25),
       end: Offset.zero,
     ).animate(_fade);
 
@@ -157,7 +157,7 @@ class _PearlToastViewState extends State<_PearlToastView>
 
     final border = isNeutral
         ? PearlElevation.border(PearlLayer.overlay, isDark)
-        : color.withValues(alpha: isDark ? 0.34 : 0.30);
+        : color.withValues(alpha: isDark ? 0.42 : 0.36);
 
     return Align(
       alignment: Alignment.topCenter,
@@ -192,14 +192,17 @@ class _PearlToastViewState extends State<_PearlToastView>
                       decoration: BoxDecoration(
                         color: isNeutral
                             ? PearlElevation.fill(PearlLayer.overlay, isDark)
-                            : color.withValues(alpha: isDark ? 0.16 : 0.12),
+                            : Color.alphaBlend(
+                                color.withValues(alpha: isDark ? 0.18 : 0.16),
+                                PearlElevation.fill(PearlLayer.overlay, isDark),
+                              ),
                         borderRadius: BorderRadius.circular(999),
                         border: Border.all(color: border),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(_icon(type), size: 17, color: color),
+                          Icon(_icon(type), size: 18, color: color),
                           const SizedBox(width: 9),
                           Flexible(
                             child: Text(
