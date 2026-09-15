@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../constants/app_constants.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 /// 线上版本信息（来自蒲公英）
 class AppUpdateInfo {
@@ -54,11 +55,8 @@ class AppUpdateService {
   /// 蒲公英会自己比对，直接给 [AppUpdateInfo.hasUpdate]，无需本地比版本号。
   Future<AppUpdateInfo> check(String currentVersion) async {
     if (!AppConstants.hasPgyerKey) {
-      throw const AppUpdateException(
-        '未配置蒲公英 API Key\n'
-        '构建时缺少 --dart-define=PGYER_API_KEY',
-      );
-    }
+        throw AppUpdateException(L.s.noApiKey);
+      }
 
     final Response<dynamic> resp;
     try {
@@ -74,17 +72,17 @@ class AppUpdateService {
         options: Options(contentType: Headers.formUrlEncodedContentType),
       );
     } on DioException catch (e) {
-      throw AppUpdateException('检查更新失败：${e.message ?? e.type.name}');
+      throw AppUpdateException(L.s.checkFailed(e.message ?? e.type.name));
     }
 
     final body = resp.data;
     if (body is! Map) {
-      throw const AppUpdateException('检查更新失败：返回格式异常');
+      throw AppUpdateException(L.s.checkBadFormat);
     }
     final code = body['code'];
     if (code != 0) {
       throw AppUpdateException(
-        '蒲公英返回错误 code=$code ${body['message'] ?? ''}'.trim(),
+        L.s.pgyerError('$code', '${body['message'] ?? ''}').trim(),
       );
     }
 
@@ -130,7 +128,7 @@ class AppUpdateService {
         ),
       );
     } on DioException catch (e) {
-      throw AppUpdateException('下载失败：${e.message ?? e.type.name}');
+      throw AppUpdateException(L.s.downloadFailed(e.message ?? e.type.name));
     }
     return savePath;
   }

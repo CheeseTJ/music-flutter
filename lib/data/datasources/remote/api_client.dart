@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/signer.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class ApiClient {
   late final Dio _dio;
@@ -45,7 +46,7 @@ class ApiClient {
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      _throwDioError(e, '上传');
+      _throwDioError(e, L.s.opUpload);
     }
   }
 
@@ -59,7 +60,7 @@ class ApiClient {
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      _throwDioError(e, '歌词上传');
+      _throwDioError(e, L.s.opLyricUpload);
     }
   }
 
@@ -83,7 +84,7 @@ class ApiClient {
         options: Options(headers: headers),
       );
     } on DioException catch (e) {
-      _throwDioError(e, '删除歌曲');
+      _throwDioError(e, L.s.deleteSong);
     }
   }
 
@@ -93,7 +94,7 @@ class ApiClient {
       detail += ' | Status: ${e.response?.statusCode}';
       detail += ' | Body: ${e.response?.data}';
     }
-    throw Exception('$op失败: $detail');
+    throw Exception(L.s.opFailed(op, detail));
   }
 }
 

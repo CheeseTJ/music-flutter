@@ -19,6 +19,7 @@ import 'package:music_app/data/models/song.dart' as local_song;
 import 'package:music_app/core/utils/settings.dart';
 import 'package:music_app/core/widgets/pearl_toast.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 
 
@@ -63,15 +64,15 @@ class MusicPlatformMeta {
   static String label(String platform) {
     switch (platform) {
       case 'netease':
-        return '网易云';
+        return L.s.platformNetease;
       case 'qq':
         return 'QQ';
       case 'kuwo':
-        return '酷我';
+        return L.s.platformKuwo;
       case 'kugou':
-        return '酷狗';
+        return L.s.platformKugou;
       case 'migu':
-        return '咪咕';
+        return L.s.platformMigu;
       default:
         return platform.toUpperCase();
     }
@@ -285,7 +286,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       final url = await mgr.getBestUrl(song);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
-          PearlToast.error(context, '\u83b7\u53d6\u64ad\u653e\u94fe\u63a5\u5931\u8d25');
+          PearlToast.error(context, L.s.playLinkFailed);
         }
         return;
       }
@@ -295,7 +296,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           platform: song.platform, id: song.id, lyric: lrc.isEmpty ? null : lrc);
     } catch (e) {
       if (mounted) {
-        PearlToast.error(context, '\u64ad\u653e\u5931\u8d25: $e');
+        PearlToast.error(context, L.s.playFailed('$e'));
       }
     }
   }
@@ -331,7 +332,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      '导入音质 · ${song.name}',
+                      L.s.importQuality(song.name),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -350,7 +351,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                   leading: Icon(Icons.high_quality_rounded,
                       size: 20, color: PearlColors.accent(isDark)),
                   title: Text(
-                    opt['label']?.toString() ?? opt['value']?.toString() ?? '未知',
+                    opt['label']?.toString() ?? opt['value']?.toString() ?? L.s.unknown,
                     style: TextStyle(
                         fontSize: 14, color: PearlColors.textPrimary(isDark)),
                   ),
@@ -384,7 +385,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       final url = await mgr.getUrlForImport(song, quality);
       if (url == null || url.url.isEmpty) {
         if (mounted) {
-          PearlToast.error(context, '\u83b7\u53d6\u4e0b\u8f7d\u94fe\u63a5\u5931\u8d25');
+          PearlToast.error(context, L.s.downloadLinkFailed);
         }
         return;
       }
@@ -397,10 +398,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 
       // 提示：所选档为 30s 试听，已自动改用完整版（或全部试听时保留试听）
       if (url.trial && mounted) {
-        PearlToast.warning(context, '${song.name} 仅提供试听片段（30s）');
+        PearlToast.warning(context, L.s.trialOnly(song.name));
       } else if (url.reason == 'trial_fallback' && mounted) {
         PearlToast.success(
-            context, '所选音质为试听片段，已自动改用完整版（${(url.bitrate ?? 0)}kbps）');
+            context, L.s.trialFallback('${url.bitrate ?? 0}'));
       }
 
       // 走现有的本地上传逻辑
@@ -412,7 +413,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       try { await File(tempPath).delete(); } catch (_) {}
 
       if (!ok) {
-        throw Exception(result['error']?.toString() ?? '\u4e0a\u4f20\u5931\u8d25');
+        throw Exception(result['error']?.toString() ?? L.s.uploadFailed);
       }
 
       // 上传歌词（如有）
@@ -429,11 +430,11 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
         ref.read(songListProvider.notifier).load();
 
       if (mounted) {
-        PearlToast.success(context, '${song.name} \u5df2\u6dfb\u52a0\u5230\u66f2\u5e93');
+        PearlToast.success(context, L.s.addedToLibrary(song.name));
       }
     } catch (e) {
       if (mounted) {
-        PearlToast.error(context, '\u5bfc\u5165\u5931\u8d25: $e');
+        PearlToast.error(context, L.s.importFailed('$e'));
       }
     } finally {
       if (mounted) {
@@ -493,7 +494,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
                               onChanged: _onQueryChanged,
                               textInputAction: TextInputAction.search,
                               decoration: InputDecoration(
-                                hintText: '\u641c\u7d22\u6b4c\u66f2\u6216\u6b4c\u624b...',
+                                hintText: L.s.searchSingerHint,
                                 prefixIcon: Icon(Icons.search_rounded, size: 20,
                                     color: PearlColors.textDisabled(isDark)),
                                 filled: true,
@@ -542,7 +543,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           padding: const EdgeInsets.fromLTRB(16, 4, 12, 8),
           child: Row(
             children: [
-              Text('\u641c\u7d22\u5386\u53f2',
+              Text(L.s.searchHistoryTitle,
                   style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
               const Spacer(),
               GestureDetector(
@@ -604,10 +605,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
               Icon(Icons.music_note_rounded, size: 56,
                   color: PearlColors.textDisabled(isDark)),
               const SizedBox(height: 16),
-              Text('\u641c\u7d22\u672c\u5730 + \u5728\u7ebf\u6b4c\u66f2',
+              Text(L.s.searchLocalOnline,
                   style: TextStyle(fontSize: 16, color: PearlColors.textSecondary(isDark))),
               const SizedBox(height: 4),
-              Text('\u540c\u65f6\u5339\u914d\u66f2\u5e93\u548c\u5728\u7ebf\u5e73\u53f0',
+              Text(L.s.searchLocalOnlineHint,
                   style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
             ],
           ),
@@ -624,10 +625,10 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
             Icon(Icons.search_off_rounded, size: 48,
                 color: PearlColors.textDisabled(isDark)),
             const SizedBox(height: 12),
-            Text('\u6ca1\u6709\u627e\u5230\u76f8\u5173\u6b4c\u66f2',
+            Text(L.s.noResult,
                 style: TextStyle(fontSize: 15, color: PearlColors.textSecondary(isDark))),
             const SizedBox(height: 4),
-            Text('\u6362\u4e2a\u5173\u952e\u8bcd\u6216\u7ebf\u8def\u8bd5\u8bd5',
+            Text(L.s.noResultHint,
                 style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
           ],
         ),
@@ -641,7 +642,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           _SectionHeader(
             icon: Icons.library_music_rounded,
             iconColor: const Color(0xFF44D3FF),
-            title: '\u672c\u5730\u6b4c\u66f2',
+            title: L.s.localSongs,
             count: _localResults.length,
             isDark: isDark,
           ),
@@ -668,7 +669,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
           _SectionHeader(
             icon: _loading ? Icons.cloud_sync_rounded : Icons.cloud_rounded,
             iconColor: PearlColors.accent(isDark),
-            title: _loading ? '\u6b63\u5728\u641c\u7d22\u5728\u7ebf' : '\u5728\u7ebf\u7ed3\u679c',
+            title: _loading ? L.s.searchingOnline : L.s.onlineResults,
             count: hasOnline ? _results.length : null,
             isDark: isDark,
             // Small inline spinner next to the header so the user

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../animation/pearl_motion.dart';
 import '../theme/pearl_colors.dart';
 import '../theme/pearl_elevation.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 /// 锚定菜单的一项。
 class PearlMenuEntry<T> {
@@ -36,7 +37,7 @@ Future<T?> showPearlMenu<T>({
   double gap = 6,
   double itemHeight = 42,
   EdgeInsets margin = const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-  String barrierLabel = '关闭菜单',
+  String? barrierLabel,
 }) {
   final anchorBox = anchorContext.findRenderObject() as RenderBox?;
   if (anchorBox == null || !anchorBox.hasSize) return Future<T?>.value();
@@ -67,7 +68,7 @@ Future<T?> showPearlMenu<T>({
       left: left,
       top: top < margin.top ? margin.top : top,
       itemHeight: itemHeight,
-      barrierLabel: barrierLabel,
+      barrierLabel: barrierLabel ?? L.s.closeMenu,
     ),
   );
 }

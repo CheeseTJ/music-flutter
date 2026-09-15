@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../features/import/models/song.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 /// music-api（music.june-t.top）客户端：聚合搜索 / 取链 / 歌词。
 ///
@@ -91,18 +92,18 @@ class MusicApi {
   String _tokenOf(Song song) {
     final token = song.extra?['token'];
     if (token is String && token.isNotEmpty) return token;
-    throw Exception('缺少歌曲 token，请重新搜索');
+    throw Exception(L.s.missingToken);
   }
 
   /// 统一 envelope：code != 0 时抛出，成功返回 data。
   dynamic _unwrap(Response resp) {
     final body = resp.data;
     if (body is! Map<String, dynamic>) {
-      throw Exception('接口返回格式异常');
+      throw Exception(L.s.badFormat);
     }
     final code = body['code'];
     if (code != 0) {
-      throw Exception(body['message']?.toString() ?? '请求失败(code=$code)');
+      throw Exception(body['message']?.toString() ?? L.s.requestFailed('$code'));
     }
     return body['data'];
   }

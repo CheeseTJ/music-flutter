@@ -16,6 +16,7 @@ import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 enum FilterOption { all, noLyric, duplicates, sortByName, recent }
 
@@ -63,26 +64,26 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       context: context,
       anchorContext: anchorContext,
       selected: _filter,
-      entries: const [
+      entries: [
         PearlMenuEntry(
             value: FilterOption.all,
-            label: '默认',
+            label: L.s.filterDefault,
             icon: Icons.format_list_bulleted_rounded),
         PearlMenuEntry(
             value: FilterOption.noLyric,
-            label: '缺歌词',
+            label: L.s.filterNoLyric,
             icon: Icons.lyrics_outlined),
         PearlMenuEntry(
             value: FilterOption.duplicates,
-            label: '重名筛查',
+            label: L.s.filterDuplicates,
             icon: Icons.content_copy_rounded),
         PearlMenuEntry(
             value: FilterOption.sortByName,
-            label: '按名称排序',
+            label: L.s.filterSortByName,
             icon: Icons.sort_by_alpha_rounded),
         PearlMenuEntry(
             value: FilterOption.recent,
-            label: '最近添加',
+            label: L.s.filterRecent,
             icon: Icons.access_time_rounded),
       ],
     );
@@ -305,7 +306,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                         color: PearlColors.textPrimary(isDark),
                       )),
                   const SizedBox(height: 2),
-                  Text('Your Collection',
+                  Text(L.s.yourLibrary,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
@@ -352,7 +353,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                   controller: _searchCtrl,
                   readOnly: true,
                   decoration: InputDecoration(
-                    hintText: '搜索本地 + 在线歌曲...',
+                    hintText: L.s.searchHint,
                     prefixIcon: Icon(Icons.search_rounded, size: 20,
                         color: PearlColors.textDisabled(isDark)),
                     filled: true,
@@ -383,7 +384,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
               child: Row(
                 children: [
                   Text(
-                    _filter == FilterOption.sortByName ? 'A-Z · ${filtered.length} 首' : '共 ${filtered.length} 首',
+                    _filter == FilterOption.sortByName ? L.s.countSongs('${filtered.length}') : L.s.countSongs('${filtered.length}'),
                     style: TextStyle(fontSize: 12, color: PearlColors.textSecondary(isDark)),
                   ),
                   const Spacer(),
@@ -400,7 +401,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                         children: [
                           Icon(Icons.playlist_play_rounded, size: 14, color: PearlColors.accent(isDark)),
                           const SizedBox(width: 4),
-                          Text('Play All',
+                          Text(L.s.playAll,
                               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                                   color: PearlColors.accent(isDark))),
                         ],
@@ -567,7 +568,7 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
                         icon: notifier.player.playing
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
-                        label: notifier.player.playing ? '暂停' : '播放',
+                        label: notifier.player.playing ? L.s.pause : L.s.play,
                         color: PearlColors.accent(isDark),
                         onTap: () {
                           Navigator.pop(ctx);
@@ -577,7 +578,7 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
                     if (!song.hasLyric)
                       _MenuTile(
                         icon: Icons.lyrics_outlined,
-                        label: '上传歌词',
+                        label: L.s.uploadLyrics,
                         color: PearlColors.accent(isDark),
                         onTap: () {
                           Navigator.pop(ctx);
@@ -585,7 +586,7 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
                       ),
                     _MenuTile(
                       icon: Icons.delete_outline_rounded,
-                      label: '删除歌曲',
+                      label: L.s.deleteSong,
                       color: const Color(0xFFFF7A9E),
                       onTap: () async {
                         Navigator.pop(ctx);
@@ -593,7 +594,7 @@ void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
                           await ref.read(songListProvider.notifier).removeSong(song.id);
                         } catch (e) {
                           if (context.mounted) {
-                            PearlToast.error(context, '删除失败: $e');
+                            PearlToast.error(context, L.s.deleteFailed('$e'));
                           }
                         }
                       },
@@ -656,13 +657,13 @@ class _EmptyView extends StatelessWidget {
               size: 56,
               color: PearlColors.textDisabled(isDark)),
           const SizedBox(height: 16),
-          Text('还没有歌曲',
+          Text(L.s.emptyTitle,
               style: TextStyle(
                 fontSize: 16,
                 color: PearlColors.textSecondary(isDark),
               )),
           const SizedBox(height: 6),
-          Text('上传你的第一首歌吧',
+          Text(L.s.emptyHint,
               style: TextStyle(
                 fontSize: 13,
                 color: PearlColors.textDisabled(isDark),
@@ -687,7 +688,7 @@ class _ErrorView extends StatelessWidget {
           Icon(Icons.cloud_off_rounded, size: 56,
               color: const Color(0xFFFF7A9E)),
           const SizedBox(height: 16),
-          Text('加载失败',
+          Text(L.s.loadFailed,
               style: TextStyle(
                 fontSize: 16,
                 color: PearlColors.textSecondary(isDark),
@@ -700,7 +701,7 @@ class _ErrorView extends StatelessWidget {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             ),
-            child: const Text('重试'),
+            child: Text(L.s.retry),
           ),
         ],
       ),

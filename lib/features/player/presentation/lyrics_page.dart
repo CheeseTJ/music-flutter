@@ -4,6 +4,7 @@ import '../../../core/theme/pearl_colors.dart';
 import '../../../data/models/song.dart';
 import '../../player/providers/player_provider.dart';
 import 'widgets/lyrics_scroller.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class LyricsPage extends ConsumerStatefulWidget {
   final Song song;
@@ -30,7 +31,7 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
               color: textP),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Lyrics',
+        title: Text(L.s.lyricsTitle,
             style: TextStyle(color: textP, fontSize: 17, fontWeight: FontWeight.w600)),
         centerTitle: true,
       ),

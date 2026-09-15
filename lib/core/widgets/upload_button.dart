@@ -7,6 +7,7 @@ import 'pearl_toast.dart';
 import '../../core/crypto/kgm.dart';
 import '../../data/datasources/remote/api_client.dart';
 import '../../features/collection/providers/song_list_provider.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class UploadButton extends ConsumerWidget {
   final bool isDark;
@@ -90,12 +91,12 @@ class UploadButton extends ConsumerWidget {
     if (success > 0) {
       PearlToast.success(
         context,
-        'Imported $success file${success == 1 ? '' : 's'}${failed > 0 ? ' ($failed failed)' : ''}',
+        L.s.importDone('$success', failed > 0 ? L.s.importDoneFailed('$failed') : ''),
       );
     } else if (failed > 0) {
       PearlToast.error(
         context,
-        'Import failed for $failed file${failed == 1 ? '' : 's'}',
+        L.s.importAllFailed('$failed'),
       );
     }
   }

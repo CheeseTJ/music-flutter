@@ -15,6 +15,7 @@ import '../../../core/utils/settings.dart';
 import '../../../core/widgets/pearl_toast.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class VaultPage extends ConsumerStatefulWidget {
   const VaultPage({super.key});
@@ -142,7 +143,7 @@ class _StorageHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Library',
+          Text(L.s.library,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -174,7 +175,7 @@ class _StorageHero extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text('Audio + lyric cache on this device',
+          Text(L.s.librarySub,
               style: TextStyle(
                 fontSize: 13,
                 color: PearlColors.textSecondary(isDark),
@@ -216,9 +217,9 @@ class _StatsCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(child: _StatCell(label: 'Songs',     value: '$totalSongs', isDark: isDark)),
+          Expanded(child: _StatCell(label: L.s.statSongs,     value: '$totalSongs', isDark: isDark)),
           _Divider(isDark: isDark),
-          Expanded(child: _StatCell(label: 'Lyrics',    value: '$totalLyrics', isDark: isDark)),
+          Expanded(child: _StatCell(label: L.s.statLyrics,    value: '$totalLyrics', isDark: isDark)),
         ],
       ),
     );
@@ -291,7 +292,7 @@ class _HistoryEntry extends StatelessWidget {
             Icon(Icons.history, size: 20, color: PearlColors.accent(isDark)),
             const SizedBox(width: 14),
             Expanded(
-              child: Text('Play History',
+              child: Text(L.s.playHistory,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -329,7 +330,7 @@ class _SettingsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle('Settings', isDark: isDark),
+        _SectionTitle(L.s.settingsTitle, isDark: isDark),
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
@@ -340,26 +341,122 @@ class _SettingsSection extends StatelessWidget {
             children: [
               _ToggleRow(
                 icon: Icons.cloud_upload_outlined,
-                title: 'Show Upload Button',
-                subtitle: 'Quick file picker on the bottom bar',
+                title: L.s.showUploadButton,
+                subtitle: L.s.showUploadButtonHint,
                 value: showUploadButton,
                 isDark: isDark,
                 onChanged: onUploadButtonChanged,
               ),
               _ToggleRow(
                 icon: Icons.play_circle_outline,
-                title: 'Show Mini Player',
-                subtitle: 'Now-playing bar above the tab bar',
+                title: L.s.showMiniPlayer,
+                subtitle: L.s.showMiniPlayerHint,
                 value: showMiniPlayer,
                 isDark: isDark,
                 onChanged: onMiniPlayerChanged,
               ),
+              Divider(height: 1, indent: 16, endIndent: 16, color: PearlColors.bgTertiary(isDark)),
+              _LangRow(isDark: isDark),
               Divider(height: 1, indent: 16, endIndent: 16, color: PearlColors.bgTertiary(isDark)),
               _ClearCacheRow(isDark: isDark),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 语言切换：中文 / English 两个 chip。
+///
+/// 这一行的标题故意写成中英并排 —— 语言选择本身不能跟着语言翻译，
+/// 否则用户切到看不懂的语言后就找不回来了。
+class _LangRow extends ConsumerWidget {
+  final bool isDark;
+  const _LangRow({required this.isDark});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lang = ref.watch(appLangProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        children: [
+          Icon(Icons.translate_rounded, size: 20, color: PearlColors.accent(isDark)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              '语言 / Language',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: PearlColors.textPrimary(isDark),
+              ),
+            ),
+          ),
+          for (final entry in const [('zh', '中文'), ('en', 'English')])
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _LangChip(
+                label: entry.$2,
+                selected: (entry.$1 == 'en') == (lang == AppLang.en),
+                isDark: isDark,
+                onTap: () async {
+                  final next = entry.$1 == 'en' ? AppLang.en : AppLang.zh;
+                  if (next == lang) return;
+                  await Settings.setLang(entry.$1);
+                  ref.read(appLangProvider.notifier).state = next;
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LangChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _LangChip({
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = PearlColors.accent(isDark);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: PearlMotion.durationSm,
+        curve: PearlMotion.standard,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? accent.withValues(alpha: 0.16)
+              : PearlColors.bgTertiary(isDark),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? accent.withValues(alpha: 0.5)
+                : Colors.transparent,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? accent : PearlColors.textSecondary(isDark),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -381,7 +478,7 @@ class _ClearCacheRowState extends State<_ClearCacheRow> {
     if (!mounted) return;
     setState(() => _clearing = false);
     if (context.mounted) {
-      PearlToast.show(context, '封面缓存已清空', duration: const Duration(seconds: 2));
+      PearlToast.show(context, L.s.coverCacheCleared, duration: const Duration(seconds: 2));
     }
   }
 
@@ -401,13 +498,13 @@ class _ClearCacheRowState extends State<_ClearCacheRow> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Clear Cover Cache',
+                Text(L.s.clearCoverCache,
                     style: TextStyle(
                       fontSize: 15, fontWeight: FontWeight.w500,
                       color: PearlColors.textPrimary(widget.isDark),
                     )),
                 const SizedBox(height: 2),
-                Text('Remove all cached cover images',
+                Text(L.s.clearCoverCacheHint,
                     style: TextStyle(
                       fontSize: 12,
                       color: PearlColors.textSecondary(widget.isDark),
@@ -505,7 +602,7 @@ class _AboutSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle('About', isDark: isDark),
+        _SectionTitle(L.s.aboutTitle, isDark: isDark),
         const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
@@ -624,7 +721,7 @@ class _UpdateRowState extends State<_UpdateRow> {
   Future<void> _onTapRow() async {
     if (_checking || _downloading) return;
     if (!AppConstants.hasPgyerKey) {
-      _toast('未配置蒲公英 API Key，无法检查更新', type: PearlToastType.warning);
+      _toast(L.s.noPgyerKey, type: PearlToastType.warning);
       return;
     }
     if (_expanded) {
@@ -640,7 +737,7 @@ class _UpdateRowState extends State<_UpdateRow> {
     if (_hasUpdate) {
       setState(() => _expanded = true);
     } else {
-      _toast('已是最新版本 v$_version', type: PearlToastType.success);
+      _toast(L.s.upToDate(_version), type: PearlToastType.success);
     }
   }
 
@@ -648,7 +745,7 @@ class _UpdateRowState extends State<_UpdateRow> {
     final info = _info;
     if (info == null) return;
     if (info.downloadUrl.isEmpty) {
-      _toast('蒲公英没有返回下载地址', type: PearlToastType.error);
+      _toast(L.s.noDownloadUrl, type: PearlToastType.error);
       return;
     }
     setState(() {
@@ -671,8 +768,7 @@ class _UpdateRowState extends State<_UpdateRow> {
 
       final result = await OpenFilex.open(path);
       if (result.type != ResultType.done) {
-        _toast('无法调起安装器：${result.message}\n'
-            '若提示签名冲突，请先卸载旧版本再安装', type: PearlToastType.warning);
+        _toast(L.s.installerFailed(result.message), type: PearlToastType.warning);
       }
     } catch (e) {
       if (mounted) setState(() => _downloading = false);
@@ -704,7 +800,7 @@ class _UpdateRowState extends State<_UpdateRow> {
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Text('Version',
+                  child: Text(L.s.versionLabel,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
@@ -750,7 +846,7 @@ class _UpdateRowState extends State<_UpdateRow> {
               color: accent.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(999),
             ),
-            child: Text('可更新 v${_info!.latestVersion}',
+            child: Text(L.s.updateAvailable(_info!.latestVersion),
                 style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w600, color: accent)),
           ),
@@ -817,7 +913,7 @@ class _UpdateRowState extends State<_UpdateRow> {
           ),
           if (info.fileSizeText.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text('安装包 ${info.fileSizeText}',
+            Text(L.s.packageSize(info.fileSizeText),
                 style: TextStyle(
                     fontSize: 12, color: PearlColors.textSecondary(isDark))),
           ],
@@ -869,9 +965,9 @@ class _UpdateRowState extends State<_UpdateRow> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('立即更新',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    child: Text(L.s.updateNow,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -880,7 +976,7 @@ class _UpdateRowState extends State<_UpdateRow> {
                   style: TextButton.styleFrom(
                     foregroundColor: PearlColors.textSecondary(isDark),
                   ),
-                  child: const Text('收起'),
+                  child: Text(L.s.collapse),
                 ),
               ],
             ),

@@ -14,6 +14,7 @@ import '../../../data/models/song.dart';
 import '../../../core/network/platform_cover_service.dart';
 import '../../player/providers/player_provider.dart';
 import '../../collection/providers/song_list_provider.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   final Song song;
@@ -595,11 +596,11 @@ class _CurrentLyricLineState extends ConsumerState<_CurrentLyricLine> {
                   }),
                 );
               } else if (state.lyricFailed) {
-                child = Text('暂无歌词',
+                child = Text(L.s.noLyric,
                     key: const ValueKey('lyric-empty'),
                     style: TextStyle(fontSize: 14, color: textS));
               } else {
-                child = Text('加载歌词中...',
+                child = Text(L.s.loadingLyric,
                     key: const ValueKey('lyric-loading'),
                     style: TextStyle(fontSize: 14, color: textS));
               }
@@ -747,11 +748,11 @@ class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
                           children: [
                             Icon(Icons.lyrics_outlined, size: 56, color: textD),
                             const SizedBox(height: 16),
-                            Text('暂无歌词', style: TextStyle(color: textS, fontSize: 16)),
+                            Text(L.s.noLyric, style: TextStyle(color: textS, fontSize: 16)),
                             if (widget.song.hasLyric)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
-                                child: Text('纯音乐，请欣赏',
+                                child: Text(L.s.instrumental,
                                     style: TextStyle(color: textD, fontSize: 13)),
                               ),
                           ],
@@ -853,7 +854,7 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
                 ),
               ),
               Text(
-                '播放列表',
+                L.s.playlist,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
@@ -865,7 +866,7 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
                 height: 320,
                 child: songs.isEmpty
                     ? Center(
-                        child: Text('暂无歌曲',
+                        child: Text(L.s.noSongs,
                             style: TextStyle(color: PearlColors.textSecondary(isDark))))
                     : ListView.builder(
                         itemCount: songs.length,

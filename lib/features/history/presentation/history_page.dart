@@ -6,6 +6,7 @@ import '../../../core/utils/playback_history.dart';
 import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class PlayHistoryPage extends ConsumerStatefulWidget {
   const PlayHistoryPage({super.key});
@@ -39,19 +40,19 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: PearlColors.bgSecondary(isDark),
-        title: Text('清除记录',
+        title: Text(L.s.clearHistory,
             style: TextStyle(color: PearlColors.textPrimary(isDark))),
-        content: Text('将清除所有播放记录。',
+        content: Text(L.s.clearHistoryBody,
             style: TextStyle(color: PearlColors.textSecondary(isDark))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('取消',
+            child: Text(L.s.cancel,
                 style: TextStyle(color: PearlColors.textSecondary(isDark))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('确定',
+            child: Text(L.s.confirm,
                 style: TextStyle(color: PearlColors.accent(isDark))),
           ),
         ],
@@ -77,13 +78,13 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('播放记录'),
+        title: Text(L.s.playHistory),
         actions: [
           if (_records.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline, size: 20),
               onPressed: _clearAll,
-              tooltip: '清除记录',
+              tooltip: L.s.clearHistory,
             ),
         ],
       ),
@@ -96,7 +97,7 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
           : _records.isEmpty
               ? Center(
                   child: Text(
-                    '暂无播放记录',
+                    L.s.noHistory,
                     style: TextStyle(
                       color: PearlColors.textSecondary(isDark),
                       fontSize: 14,

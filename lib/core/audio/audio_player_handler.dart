@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'notification_service.dart';
 import 'custom_notification_service.dart';
+import 'package:music_app/core/i18n/app_strings.dart';
 
 class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
@@ -190,7 +191,7 @@ Future<void> initAudioService(StateController<MusicAudioHandler> controller) asy
         builder: () => MusicAudioHandler(),
         config: AudioServiceConfig(
           androidNotificationChannelId: 'com.example.music_app.channel.audio',
-          androidNotificationChannelName: '\u97f3\u4e50\u64ad\u653e',
+          androidNotificationChannelName: L.s.musicPlayback,
           androidNotificationIcon: 'drawable/ic_stat_music_note',
           androidNotificationClickStartsActivity: true,
           androidStopForegroundOnPause: false,
