@@ -6,9 +6,7 @@ class PearlTheme {
 
   static const double radiusSm = 16;
   static const double radiusMd = 24;
-  static const double radiusLg = 28;
   static const double radiusXl = 32;
-  static const double radiusTab = 36;
 
   static ThemeData get(Brightness brightness) {
     final isDark = brightness == Brightness.dark;

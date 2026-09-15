@@ -6,7 +6,6 @@ import '../../../data/datasources/remote/api_client.dart';
 
 class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
   final ApiClient _api;
-  bool _refreshing = false;
 
   String get _cachePath =>
       '${Directory.systemTemp.path}/music_song_cache.json';
@@ -39,12 +38,9 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
     } catch (_) {}
   }
 
-  bool get isRefreshing => _refreshing;
-
   Future<void> load() async {
     final hasData = state.valueOrNull?.isNotEmpty == true;
     if (!hasData) state = const AsyncLoading();
-    _refreshing = hasData;
 
     try {
       final jsonList = await _api.getSongList();
@@ -54,8 +50,6 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
     } catch (e, st) {
       if (!hasData) state = AsyncError(e, st);
     }
-
-    _refreshing = false;
   }
 
   Future<void> removeSong(int id) async {

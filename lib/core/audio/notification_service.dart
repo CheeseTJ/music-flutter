@@ -12,15 +12,6 @@ class NotificationService {
     }
   }
 
-  static Future<bool> get isChannelEnabled async {
-    try {
-      final result = await _channel.invokeMethod<bool>('isNotificationChannelEnabled');
-      return result ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
-
   static Future<void> openSettings() async {
     try {
       await _channel.invokeMethod('openNotificationSettings');

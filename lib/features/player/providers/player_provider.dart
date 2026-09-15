@@ -129,11 +129,8 @@ class PlayerController extends StateNotifier<PlayerState> {
   Song? get currentSong => _currentSong;
   Duration get position => _handler.position;
   Duration? get duration => _handler.duration;
-  bool get hasNext => _currentIndex < _playlist.length - 1;
-  bool get hasPrevious => _currentIndex > 0;
   int get playMode => state.playMode;
   LrcParser? get lyric => _lyric;
-  int get currentLyricIndex => _currentLyricIndex;
   bool get lyricLoading => state.lyricLoading;
   bool get lyricFailed => state.lyricFailed;
   void setPlaylist(List<Song> songs) {

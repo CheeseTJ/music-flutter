@@ -11,7 +11,6 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
   final StreamController<Duration> _positionController = StreamController<Duration>.broadcast();
 
-  String? _currentUrl;
   bool _isPlaying = false;
 
   StreamSubscription<Duration>? _positionSub;
@@ -66,7 +65,6 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
   bool get playing => _isPlaying;
-  String? get currentUrl => _currentUrl;
 
   void _broadcastState(PlaybackEvent event) {
     final playing = _player.playing;
@@ -111,7 +109,6 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
     String? album,
     Uri? artUri,
   }) async {
-    _currentUrl = url;
     debugPrint('[AudioHandler] loadSong: $title - $artist, artUri=$artUri');
     mediaItem.add(MediaItem(
       id: id,

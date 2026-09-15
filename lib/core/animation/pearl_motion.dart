@@ -8,9 +8,6 @@ class PearlMotion {
   PearlMotion._();
 
   // ---- 时长 ----
-  /// 100ms — 微反馈（按下回弹、ripple 结束）
-  static const Duration durationXs = Duration(milliseconds: 100);
-
   /// 150ms — 紧凑切换（图标切换、播放/暂停）
   static const Duration durationSm = Duration(milliseconds: 150);
 
@@ -20,14 +17,8 @@ class PearlMotion {
   /// 320ms — 浮层/抽屉进出
   static const Duration durationLg = Duration(milliseconds: 320);
 
-  /// 480ms — 强调/页面级动画
-  static const Duration durationXl = Duration(milliseconds: 480);
-
   /// 340ms — 路由 page transition
   static const Duration durationPage = Duration(milliseconds: 340);
-
-  /// 600ms — 颜色/主题过渡（封面色 → 背景色）
-  static const Duration durationColor = Duration(milliseconds: 600);
 
   /// 40s — 播放器背景 HSV 循环
   static const Duration durationBg = Duration(seconds: 40);
@@ -44,9 +35,6 @@ class PearlMotion {
 
   /// 同上别名（语义更明确）
   static const Curve accelerate = Curves.easeInCubic;
-
-  /// 进入曲线（= standard）
-  static const Curve standardOut = Curves.easeOutCubic;
 
   /// 强调 — 进度滚动、字号变化
   static const Curve emphasized = Curves.easeInOutCubic;

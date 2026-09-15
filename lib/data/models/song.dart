@@ -59,14 +59,5 @@ class Song {
     return '$m:$s';
   }
 
-  String get formatLabel => format.toUpperCase();
-
   bool get hasLyric => lyricPath != null && lyricPath!.isNotEmpty; // lyric_path is set to 'db' when lyric text stored in DB
-
-  String get sizeFormatted {
-    if (size < 1024 * 1024) {
-      return '${(size / 1024).toStringAsFixed(1)} KB';
-    }
-    return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
 }
