@@ -276,28 +276,43 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   }
 
   Future<void> _doPlay(OnlineSong song) async {
-    final playingUrlId = ref.read(playerProvider.notifier).playingUrlId;
+    final notifier = ref.read(playerProvider.notifier);
     final songId = '${song.platform}|${song.id}';
-    if (songId == playingUrlId) {
-      ref.read(playerProvider.notifier).togglePlayPause();
+    if (songId == notifier.playingUrlId) {
+      // 还在取链：忽略重复点击，否则会在「播放器里其实还没有歌」的状态下
+      // 触发一次无效的 play/pause。
+      if (ref.read(playerProvider).phase != PlayerPhase.loading) {
+        notifier.togglePlayPause();
+      }
       return;
     }
+
+    // 先进入预备态再取链：底部迷你播放器立刻以这首歌 + 转圈的形式出现，
+    // 被点的那一行也立刻高亮，不让用户对着没反应的界面干等。
+    // seq 用于竞态判定：后一次点击会让前一次的取链结果作废，不会出现
+    // 「先播第一首，再跳去第二首」。
+    final seq = notifier.beginOnlinePlay(song.name, song.singer,
+        platform: song.platform, id: song.id);
 
     try {
       final mgr = ref.read(musicManagerProvider);
       // 播放默认选最高音质：并发各档位取链，选实际 bitrate 最高的结果。
       final url = await mgr.getBestUrl(song);
+      if (!notifier.isCurrentLoad(seq)) return;
       if (url == null || url.url.isEmpty) {
+        notifier.abortOnlinePlay(seq);
         if (mounted) {
           PearlToast.error(context, L.s.playLinkFailed);
         }
         return;
       }
-      final notifier = ref.read(playerProvider.notifier);
       final lrc = await mgr.getLyric(song);
+      if (!notifier.isCurrentLoad(seq)) return;
       await notifier.playUrl(url.url, song.name, song.singer,
           platform: song.platform, id: song.id, lyric: lrc.isEmpty ? null : lrc);
     } catch (e) {
+      if (!notifier.isCurrentLoad(seq)) return;
+      notifier.abortOnlinePlay(seq);
       if (mounted) {
         PearlToast.error(context, L.s.playFailed('$e'));
       }
@@ -817,12 +832,18 @@ class _ResultTile extends StatelessWidget {
                                 color: accentColor.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Icon(
-                                  isPlaying && playerPhase == PlayerPhase.playing
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  size: 18, color: accentColor,
-                                ),
+                              child: isPlaying && playerPhase == PlayerPhase.loading
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(9),
+                                      child: PearlLoading(
+                                          size: 18, color: accentColor),
+                                    )
+                                  : Icon(
+                                      isPlaying && playerPhase == PlayerPhase.playing
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      size: 18, color: accentColor,
+                                    ),
                             ),
                           ),
                         ),
@@ -1099,13 +1120,18 @@ class _LocalResultTile extends StatelessWidget {
                     color: iconBg,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    showPause
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    size: 18,
-                    color: accent,
-                  ),
+                  child: highlight && playerPhase == PlayerPhase.loading
+                      ? const Padding(
+                          padding: EdgeInsets.all(9),
+                          child: PearlLoading(size: 18, color: accent),
+                        )
+                      : Icon(
+                          showPause
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 18,
+                          color: accent,
+                        ),
                 ),
               ],
             ),

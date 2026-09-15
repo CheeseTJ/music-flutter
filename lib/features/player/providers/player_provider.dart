@@ -57,6 +57,20 @@ class PlayerController extends StateNotifier<PlayerState> {
   bool _isSkipping = false;
   final _random = Random();
 
+  /// 播放请求序号：每发起一次「加载一首歌」就自增。
+  ///
+  /// 取链、取词、下封面都是异步的，这期间用户可能又点了别的歌。只有序号
+  /// 最大（最后一次）的那次请求才允许落地，其余全部丢弃 —— 否则慢的那次
+  /// 会在快的之后完成，表现就是「先放了第一首，再跳去第二首」。
+  int _loadSeq = 0;
+
+  /// 进入在线播放预备态之前的快照，用于取链失败时把界面还原回原来在放的歌。
+  /// 写入用 ??=：连点两首时，只有第一次（真正在放的那首）才值得还原。
+  _PrePlaySnapshot? _prePlay;
+
+  /// [seq] 是否仍是最新一次播放请求。
+  bool isCurrentLoad(int seq) => seq == _loadSeq;
+
   static String get _lyricCacheDir => '${Directory.systemTemp.path}/lyric_cache';
 
   Uri? _fallbackArtUri;
@@ -143,8 +157,11 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   Future<void> load(LocalSong song) async {
+    final seq = ++_loadSeq;
+    _prePlay = null;
     try {
-      await _loadSongInternal(song);
+      await _loadSongInternal(song, seq);
+      if (!isCurrentLoad(seq)) return;
       // 先挂监听：playingStream 订阅后会立即推送当前值，能把状态拉回真实值
       _wirePlayerStreams();
       // 加载期间用户可能已经点了播放，此时不能再无条件改回暂停
@@ -153,14 +170,20 @@ class PlayerController extends StateNotifier<PlayerState> {
       }
       _fetchLyric(song.id);
     } catch (e) {
+      if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.error);
     }
   }
 
   Future<void> play(LocalSong song) async {
+    final seq = ++_loadSeq;
+    // 本地播放不需要预备态回滚
+    _prePlay = null;
     try {
-      await _loadSongInternal(song);
+      await _loadSongInternal(song, seq);
+      if (!isCurrentLoad(seq)) return;
       await _handler.play();
+      if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.playing);
       // 原生侧用 URL(...).openConnection() 取图，只认带协议的地址。
       // 而 _lastCoverUrl 是本地文件路径（没有协议），直接传过去会 MalformedURLException，
@@ -172,13 +195,14 @@ class PlayerController extends StateNotifier<PlayerState> {
       _wirePlayerStreams();
       _fetchLyric(song.id);
     } catch (e) {
+      if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.error);
     }
   }
 
   String? _lastCoverUrl;
 
-  Future<void> _loadSongInternal(LocalSong song) async {
+  Future<void> _loadSongInternal(LocalSong song, int seq) async {
     final index = _playlist.indexWhere((s) => s.id == song.id);
     if (index >= 0) {
       _currentIndex = index;
@@ -195,11 +219,14 @@ class PlayerController extends StateNotifier<PlayerState> {
     state = state.copyWith(phase: PlayerPhase.loading);
 
     final data = await _apiClient.getPlayUrl(song.id);
+    if (!isCurrentLoad(seq)) return;
     final url = data['url'] as String;
 
     _lastCoverUrl = await const PlatformCoverService().fetch(song.type, song.title, song.artist);
+    if (!isCurrentLoad(seq)) return;
     final cover = _lastCoverUrl;
     final artUri = cover != null ? Uri.file(cover) : await _getFallbackArtUri();
+    if (!isCurrentLoad(seq)) return;
 
     await _handler.loadSong(
       url: url,
@@ -209,6 +236,7 @@ class PlayerController extends StateNotifier<PlayerState> {
       album: song.album,
       artUri: artUri,
     );
+    if (!isCurrentLoad(seq)) return;
 
     PlaybackHistory().record(song.id);
   }
@@ -369,17 +397,60 @@ class PlayerController extends StateNotifier<PlayerState> {
     }
   }
 
+  /// 在线播放的预备态：立刻把当前曲目和 loading 状态落地。
+  ///
+  /// 在线播放要先取链（并发请求所有音质档位）再取词，可能耗时数秒。若等取完
+  /// 再改状态，这段时间界面完全没有变化，用户会以为卡住了。所以这里先让底部
+  /// 迷你播放器以「这首歌 + 转圈」的形式出现，取链成功后再真正播放。
+  ///
+  /// 返回请求序号，调用方在每个 await 之后用 [isCurrentLoad] 校验，失败时用
+  /// [abortOnlinePlay] 还原界面。
+  int beginOnlinePlay(String title, String artist, {String? platform, String? id}) {
+    _prePlay ??= _PrePlaySnapshot(
+      song: _currentSong,
+      playingUrlId: _playingUrlId,
+      playlist: _playlist,
+      index: _currentIndex,
+      lyric: _lyric,
+      lyricIndex: _currentLyricIndex,
+      state: state,
+    );
+    final seq = ++_loadSeq;
+    final songId = int.tryParse(id ?? '') ?? 0;
+    _currentSong = LocalSong(
+        id: songId, title: title, artist: artist, album: '',
+        format: '', duration: 0, size: 0, createdAt: 0);
+    _lyric = null;
+    _currentLyricIndex = -1;
+    _playingUrlId = (platform != null && id != null) ? '$platform|$id' : null;
+    // 维护单曲 playlist，使 next/previous 可用
+    _playlist = [_currentSong!];
+    _currentIndex = 0;
+    state = state.copyWith(
+        phase: PlayerPhase.loading, lyricLoading: false, lyricFailed: false);
+    return seq;
+  }
+
+  /// 预备态失败：把界面还原到进入预备态之前（原来在放的那首继续在放）。
+  /// 过期的序号直接忽略 —— 那时界面已经属于更新的一次点击了。
+  void abortOnlinePlay(int seq) {
+    if (!isCurrentLoad(seq)) return;
+    final snap = _prePlay;
+    _prePlay = null;
+    if (snap == null) return;
+    _currentSong = snap.song;
+    _playingUrlId = snap.playingUrlId;
+    _playlist = snap.playlist;
+    _currentIndex = snap.index;
+    _lyric = snap.lyric;
+    _currentLyricIndex = snap.lyricIndex;
+    state = snap.state;
+  }
+
   Future<void> playUrl(String url, String title, String artist, {String? platform, String? id, String? lyric}) async {
+    final seq = beginOnlinePlay(title, artist, platform: platform, id: id);
     try {
-      state = state.copyWith(phase: PlayerPhase.loading);
-      final songId = int.tryParse(id ?? '') ?? 0;
-      _currentSong = LocalSong(id: songId, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
       _lyric = (lyric != null && lyric.isNotEmpty) ? LrcParser.parse(lyric) : null;
-      _currentLyricIndex = -1;
-      _playingUrlId = (platform != null && id != null) ? '$platform|$id' : null;
-      // 维护单曲 playlist，使 next/previous 可用
-      _playlist = [_currentSong!];
-      _currentIndex = 0;
 
       await _handler.loadSong(
         url: url,
@@ -388,15 +459,22 @@ class PlayerController extends StateNotifier<PlayerState> {
         artist: artist,
         artUri: await _getFallbackArtUri(),
       );
+      if (!isCurrentLoad(seq)) return;
       await _handler.play();
+      if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.playing);
+      // 已经真正开播，预备态不再需要回滚
+      _prePlay = null;
       _syncCustomNotification(null);
       // 在线播放也写入历史，保证最新一条可被冷启动恢复
+      final songId = _currentSong?.id ?? 0;
       if (songId != 0) {
         await PlaybackHistory().record(songId);
       }
       _wirePlayerStreams();
     } catch (e) {
+      if (!isCurrentLoad(seq)) return;
+      _prePlay = null;
       state = state.copyWith(phase: PlayerPhase.error);
     }
   }
@@ -465,3 +543,24 @@ final playerProvider = StateNotifierProvider<PlayerController, PlayerState>((ref
 
   return controller;
 });
+
+/// 进入在线播放预备态前的播放器快照，用于取链失败时还原界面。
+class _PrePlaySnapshot {
+  final LocalSong? song;
+  final String? playingUrlId;
+  final List<LocalSong> playlist;
+  final int index;
+  final LrcParser? lyric;
+  final int lyricIndex;
+  final PlayerState state;
+
+  const _PrePlaySnapshot({
+    required this.song,
+    required this.playingUrlId,
+    required this.playlist,
+    required this.index,
+    required this.lyric,
+    required this.lyricIndex,
+    required this.state,
+  });
+}

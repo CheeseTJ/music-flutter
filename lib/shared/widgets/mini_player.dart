@@ -7,6 +7,7 @@ import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_elevation.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
+import '../../core/widgets/pearl_loading.dart';
 import '../../features/player/providers/player_provider.dart';
 import 'pearl_cover.dart';
 
@@ -29,6 +30,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     if (song == null) return const SizedBox.shrink();
 
     final isPlaying = state.isPlaying;
+    final isLoading = state.phase == PlayerPhase.loading;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (song.id != _lastSongId) {
@@ -107,15 +109,29 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        isPlaying
-                            ? Icons.pause_circle_filled_rounded
-                            : Icons.play_circle_fill_rounded,
-                        size: 36,
+                    // 取链/加载期间显示转圈，不能点 —— 此时播放器里还没有歌，
+                    // 点了只会触发一次无效的 play/pause。
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: isLoading
+                            ? PearlLoading(
+                                size: 22,
+                                color: PearlColors.accent(isDark),
+                              )
+                            : IconButton(
+                                padding: EdgeInsets.zero,
+                                icon: Icon(
+                                  isPlaying
+                                      ? Icons.pause_circle_filled_rounded
+                                      : Icons.play_circle_fill_rounded,
+                                  size: 36,
+                                ),
+                                color: PearlColors.accent(isDark),
+                                onPressed: () => notifier.togglePlayPause(),
+                              ),
                       ),
-                      color: PearlColors.accent(isDark),
-                      onPressed: () => notifier.togglePlayPause(),
                     ),
                   ],
                 ),
