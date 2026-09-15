@@ -162,7 +162,13 @@ class PlayerController extends StateNotifier<PlayerState> {
       await _loadSongInternal(song);
       await _handler.play();
       state = state.copyWith(phase: PlayerPhase.playing);
-      _syncCustomNotification(_lastCoverUrl ?? _fallbackArtUri?.toString());
+      // 原生侧用 URL(...).openConnection() 取图，只认带协议的地址。
+      // 而 _lastCoverUrl 是本地文件路径（没有协议），直接传过去会 MalformedURLException，
+      // 被 catch 吞掉，表现就是通知栏永远显示兜底 logo、从不显示真实封面。
+      // 这里统一转成 file:// URI（java.net.URL 支持 file 协议）。
+      _syncCustomNotification(_lastCoverUrl != null
+          ? Uri.file(_lastCoverUrl!).toString()
+          : _fallbackArtUri?.toString());
       _wirePlayerStreams();
       _fetchLyric(song.id);
     } catch (e) {
