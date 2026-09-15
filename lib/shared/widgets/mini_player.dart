@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,8 +64,11 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: _coverUrl != null
-                          ? Image.network(
-                              _coverUrl!,
+                          // 注意：PlatformCoverService 返回的是**本地文件路径**
+                          // （把网络图下载到 systemTemp 后返回路径），不是 URL。
+                          // 这里原来用的 Image.network 会一直加载失败、静默落到占位图。
+                          ? Image.file(
+                              File(_coverUrl!),
                               width: 48,
                               height: 48,
                               fit: BoxFit.cover,
