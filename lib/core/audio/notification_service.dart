@@ -1,11 +1,10 @@
-import 'package:flutter/services.dart';
+import 'notification_channel.dart';
 
 class NotificationService {
-  static const _channel = MethodChannel('com.example.music_app/notification');
-
   static Future<bool> get isPermissionGranted async {
     try {
-      final result = await _channel.invokeMethod<bool>('isNotificationPermissionGranted');
+      final result =
+          await notificationChannel.invokeMethod<bool>('isNotificationPermissionGranted');
       return result ?? false;
     } catch (_) {
       return false;
@@ -14,13 +13,13 @@ class NotificationService {
 
   static Future<void> openSettings() async {
     try {
-      await _channel.invokeMethod('openNotificationSettings');
+      await notificationChannel.invokeMethod('openNotificationSettings');
     } catch (_) {}
   }
 
   static Future<String> debugInfo() async {
     try {
-      final result = await _channel.invokeMethod<String>('debugInfo');
+      final result = await notificationChannel.invokeMethod<String>('debugInfo');
       return result ?? 'unknown';
     } catch (e) {
       return 'error: $e';

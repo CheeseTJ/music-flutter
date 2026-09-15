@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
+
+import 'notification_channel.dart';
 
 class CustomNotificationService {
-  static const _channel = MethodChannel('com.example.music_app/notification');
-
   static bool _enabled = false;
   static bool get isEnabled => _enabled;
   static void enable() {
@@ -14,7 +13,7 @@ class CustomNotificationService {
 
   static Stream<String> get onAction {
     _actionController ??= StreamController<String>.broadcast();
-    _channel.setMethodCallHandler((call) async {
+    notificationChannel.setMethodCallHandler((call) async {
       debugPrint('[CustomNotif] onAction callback: ${call.method}');
       if (call.method == 'onPlay') {
         _actionController?.add('play');
@@ -41,7 +40,7 @@ class CustomNotificationService {
     if (!_enabled) return;
     try {
       debugPrint('[CustomNotif] show() calling native: title=$title, coverUrl=$coverUrl');
-      await _channel.invokeMethod('showCustomNotification', {
+      await notificationChannel.invokeMethod('showCustomNotification', {
         'title': title,
         'artist': artist,
         'album': album,
@@ -57,13 +56,14 @@ class CustomNotificationService {
   static Future<void> updatePlayState(bool playing) async {
     if (!_enabled) return;
     try {
-      await _channel.invokeMethod('updateCustomPlayState', {'playing': playing});
+      await notificationChannel
+          .invokeMethod('updateCustomPlayState', {'playing': playing});
     } catch (_) {}
   }
 
   static Future<void> hide() async {
     try {
-      await _channel.invokeMethod('hideCustomNotification');
+      await notificationChannel.invokeMethod('hideCustomNotification');
     } catch (_) {}
   }
 }
