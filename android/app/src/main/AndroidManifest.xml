@@ -26,6 +26,10 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+        <!-- 刻意不声明 showWhenLocked / turnScreenOn：声明之后这个 Activity 会
+             绘制在锁屏之上并直接接收输入，等于任何人都能在不输入锁屏密码的情况下
+             操作本 app（删歌、清历史等）。锁屏上的媒体控制来自 audio_service 的
+             MediaSession + 媒体通知，与这两个属性无关，删掉不影响。 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -34,8 +38,6 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:windowSoftInputMode="adjustResize">
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
