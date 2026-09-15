@@ -183,9 +183,9 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       if (songs == null || songs.isEmpty) return;
       final notifier = ref.read(playerProvider.notifier);
       notifier.setPlaylist(songs);
-      // 若存在待恢复的歌曲 ID，查找完整 Song 后加载
+      // 若存在待恢复的歌曲 ID，查找完整 LocalSong 后加载
       if (_pendingRestoreId != null && notifier.currentSong == null) {
-        final target = songs.cast<Song?>().firstWhere(
+        final target = songs.cast<LocalSong?>().firstWhere(
           (s) => s?.id == _pendingRestoreId,
           orElse: () => null,
         );
@@ -203,10 +203,10 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
       final notifier = ref.read(playerProvider.notifier);
       if (notifier.currentSong != null) return;
 
-      // 优先从缓存歌单中定位完整 Song
+      // 优先从缓存歌单中定位完整 LocalSong
       final cached = ref.read(songListProvider).valueOrNull;
       if (cached != null && cached.isNotEmpty) {
-        final song = cached.cast<Song?>().firstWhere(
+        final song = cached.cast<LocalSong?>().firstWhere(
           (s) => s?.id == lastId,
           orElse: () => null,
         );
@@ -222,8 +222,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     });
   }
 
-  List<Song> _applyFilter(List<Song> songs) {
-    var filtered = List<Song>.from(songs);
+  List<LocalSong> _applyFilter(List<LocalSong> songs) {
+    var filtered = List<LocalSong>.from(songs);
 
     switch (_filter) {
       case FilterOption.all:
@@ -257,7 +257,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     return filtered;
   }
 
-  void _playAll(List<Song> songs, WidgetRef ref) {
+  void _playAll(List<LocalSong> songs, WidgetRef ref) {
     if (songs.isEmpty) return;
     final notifier = ref.read(playerProvider.notifier);
     notifier.setPlaylist(songs);
@@ -271,7 +271,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   Widget build(BuildContext context) {
     final songsAsync = ref.watch(songListProvider);
     final songs = songsAsync.valueOrNull;
-    final filtered = songs != null ? _applyFilter(songs) : const <Song>[];
+    final filtered = songs != null ? _applyFilter(songs) : const <LocalSong>[];
     final playerState = ref.watch(playerProvider);
     final currentSong = ref.watch(playerProvider.notifier).currentSong;
     final hasSong = currentSong != null;
@@ -375,7 +375,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             ),
           ),
         ),
-        // Song count + play all button
+        // LocalSong count + play all button
         songsAsync.when(
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
@@ -494,7 +494,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   }
 }
 
-void _showSongMenu(BuildContext context, WidgetRef ref, Song song) {
+void _showSongMenu(BuildContext context, WidgetRef ref, LocalSong song) {
   final notifier = ref.read(playerProvider.notifier);
   final isCurrentSong = notifier.currentSong?.id == song.id;
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -682,7 +682,7 @@ class _ErrorView extends StatelessWidget {
 class _LocateButton extends StatelessWidget {
   final ScrollController scrollCtrl;
   final int targetId;
-  final List<Song> filtered;
+  final List<LocalSong> filtered;
 
   const _LocateButton({
     required this.scrollCtrl,

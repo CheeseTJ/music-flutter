@@ -1,4 +1,4 @@
-class Song {
+class LocalSong {
   final int id;
   final String title;
   final String artist;
@@ -10,7 +10,7 @@ class Song {
   final String type;
   final int createdAt;
 
-  const Song({
+  const LocalSong({
     required this.id,
     required this.title,
     required this.artist,
@@ -23,8 +23,8 @@ class Song {
     required this.createdAt,
   });
 
-  factory Song.fromJson(Map<String, dynamic> json) {
-    return Song(
+  factory LocalSong.fromJson(Map<String, dynamic> json) {
+    return LocalSong(
       id: json['id'] as int,
       title: json['title'] as String,
       artist: json['artist'] as String,

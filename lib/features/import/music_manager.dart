@@ -6,16 +6,16 @@ import 'models/song.dart';
 class MusicManager {
   final MusicApi _api = MusicApi();
 
-  Future<List<Song>> search(String keyword, {int num = 30}) {
+  Future<List<OnlineSong>> search(String keyword, {int num = 30}) {
     return _api.search(keyword, limit: num);
   }
 
   /// [quality] 为空 = 播放场景（默认最高音质）；导入场景由调用方传入用户所选档位。
-  Future<SongUrl?> getUrl(Song song, {String? quality}) async {
+  Future<SongUrl?> getUrl(OnlineSong song, {String? quality}) async {
     return await _api.getUrl(song, quality: quality);
   }
 
-  Future<String> getLyric(Song song) {
+  Future<String> getLyric(OnlineSong song) {
     return _api.getLyric(song);
   }
 
@@ -25,7 +25,7 @@ class MusicManager {
   /// 反而是 flac），所以并发请求所有档位，选 bitrate 最高的实际结果；
   /// 试听片段（trial）的档位排到最后，仅当全部试听时才用；
   /// 全部失败时回退默认档。音质选项缺失时只请求一次默认档。
-  Future<SongUrl?> getBestUrl(Song song) async {
+  Future<SongUrl?> getBestUrl(OnlineSong song) async {
     final opts = qualityOptionsOf(song);
     if (opts.length < 2) {
       return await _api.getUrl(song, quality: bestQualityOf(song));
@@ -51,7 +51,7 @@ class MusicManager {
 
   /// 导入场景：优先使用用户所选档位；若该档是 30s 试听片段，
   /// 自动回退到其余档位中最高的完整版（全部试听时才用当前档）。
-  Future<SongUrl?> getUrlForImport(Song song, String? quality) async {
+  Future<SongUrl?> getUrlForImport(OnlineSong song, String? quality) async {
     SongUrl? chosen;
     try {
       chosen = await _api.getUrl(song, quality: quality);
@@ -97,7 +97,7 @@ class MusicManager {
 
   /// 该歌曲可选的音质档位列表（来自搜索结果的 qualityOptions），
   /// 形如 [{value, label, quality, format}]；后端未提供时返回空。
-  List<Map<String, dynamic>> qualityOptionsOf(Song song) {
+  List<Map<String, dynamic>> qualityOptionsOf(OnlineSong song) {
     final opts = song.extra?['qualityOptions'];
     if (opts is List) {
       return opts.whereType<Map<String, dynamic>>().toList();
@@ -106,7 +106,7 @@ class MusicManager {
   }
 
   /// 默认最高音质：qualityOptions 的最后一档；未知结构时回退 null（后端默认档）。
-  String? bestQualityOf(Song song) {
+  String? bestQualityOf(OnlineSong song) {
     final opts = qualityOptionsOf(song);
     if (opts.isNotEmpty) {
       return opts.last['value']?.toString();

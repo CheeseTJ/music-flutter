@@ -1,4 +1,4 @@
-class Song {
+class OnlineSong {
   final String platform; // qq / netease / kuwo / kugou / migu
   final String source;   // dedicated / meting
   final String id;
@@ -9,7 +9,7 @@ class Song {
   final String? quality;
   final Map<String, dynamic>? extra; // 透传额外数据（签名等）
 
-  Song({
+  OnlineSong({
     required this.platform,
     this.source = 'dedicated',
     required this.id,
@@ -21,7 +21,7 @@ class Song {
     this.extra,
   });
 
-  Song copyWith({String? source}) => Song(
+  OnlineSong copyWith({String? source}) => OnlineSong(
     platform: platform,
     source: source ?? this.source,
     id: id,
@@ -35,7 +35,7 @@ class Song {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Song && platform == other.platform && id == other.id;
+      other is OnlineSong && platform == other.platform && id == other.id;
 
   @override
   int get hashCode => platform.hashCode ^ id.hashCode;

@@ -18,7 +18,7 @@ import 'package:music_app/core/i18n/app_strings.dart';
 import 'package:music_app/core/widgets/pearl_empty_state.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
-  final Song song;
+  final LocalSong song;
   const PlayerPage({super.key, required this.song});
 
   @override
@@ -73,7 +73,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     super.dispose();
   }
 
-  Future<void> _fetchCover(Song song) async {
+  Future<void> _fetchCover(LocalSong song) async {
     final id = song.id;
     _lastSongId = id;
 
@@ -216,7 +216,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   Widget _buildMainContent(
     bool isDark,
-    Song song,
+    LocalSong song,
     bool isPlaying,
     PlayerController notifier,
     Size size,
@@ -497,7 +497,7 @@ class _SmallBtn extends StatelessWidget {
 }
 
 class _CurrentLyricLine extends ConsumerStatefulWidget {
-  final Song song;
+  final LocalSong song;
   final bool isDark;
   final VoidCallback onTap;
   const _CurrentLyricLine({
@@ -650,7 +650,7 @@ class _LyricLineEntry {
 class _LyricsOverlay extends ConsumerStatefulWidget {
   final bool isDark;
   final AnimationController controller;
-  final Song song;
+  final LocalSong song;
   final VoidCallback onDismiss;
   const _LyricsOverlay({
     required this.isDark,
@@ -1031,7 +1031,7 @@ class _GradientCover extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.18),
             ),
           ),
-          // Song initial at the centre.
+          // LocalSong initial at the centre.
           Center(
             child: Text(
               _letter(),

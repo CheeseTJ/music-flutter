@@ -21,7 +21,7 @@ class MusicApi {
   }
 
   /// 聚合搜索（后端已做多源聚合，无需指定 provider / 线路）。
-  Future<List<Song>> search(String keyword, {int limit = 30}) async {
+  Future<List<OnlineSong>> search(String keyword, {int limit = 30}) async {
     final resp = await _dio.get('/api/search', queryParameters: {
       'q': keyword,
       'limit': limit,
@@ -35,7 +35,7 @@ class MusicApi {
   ///
   /// [quality] 为空时使用后端默认档（搜索时的 selectedLevel）；
   /// 传 qualityOptions 里的 value（如 standard/exhigh/lossless/hires/jymaster...）覆盖。
-  Future<SongUrl> getUrl(Song song, {String? quality}) async {
+  Future<SongUrl> getUrl(OnlineSong song, {String? quality}) async {
     final token = _tokenOf(song);
     final params = <String, dynamic>{'token': token};
     if (quality != null && quality.isNotEmpty) params['quality'] = quality;
@@ -59,7 +59,7 @@ class MusicApi {
   }
 
   /// 获取歌词（LRC 文本），无歌词时返回空字符串。
-  Future<String> getLyric(Song song) async {
+  Future<String> getLyric(OnlineSong song) async {
     final resp = await _dio.get('/api/lyric', queryParameters: {
       'token': _tokenOf(song),
     });
@@ -69,9 +69,9 @@ class MusicApi {
 
   // ── helpers ──
 
-  Song _toSong(Map<String, dynamic> item) {
+  OnlineSong _toSong(Map<String, dynamic> item) {
     final extra = (item['extra'] as Map<String, dynamic>?) ?? const {};
-    return Song(
+    return OnlineSong(
       platform: (item['provider'] as String?) ?? '',
       id: (item['id'] as String?) ?? '',
       name: (item['title'] as String?) ?? '',
@@ -89,7 +89,7 @@ class MusicApi {
     );
   }
 
-  String _tokenOf(Song song) {
+  String _tokenOf(OnlineSong song) {
     final token = song.extra?['token'];
     if (token is String && token.isNotEmpty) return token;
     throw Exception(L.s.missingToken);

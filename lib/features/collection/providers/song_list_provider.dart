@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/song.dart';
 import '../../../data/datasources/remote/api_client.dart';
 
-class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
+class SongListNotifier extends StateNotifier<AsyncValue<List<LocalSong>>> {
   final ApiClient _api;
 
   String get _cachePath =>
@@ -25,13 +25,13 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
     } catch (_) {}
   }
 
-  static List<Song> _parseSongList(String json) {
+  static List<LocalSong> _parseSongList(String json) {
     return (jsonDecode(json) as List)
-        .map((j) => Song.fromJson(j as Map<String, dynamic>))
+        .map((j) => LocalSong.fromJson(j as Map<String, dynamic>))
         .toList();
   }
 
-  Future<void> _saveCache(List<Song> songs) async {
+  Future<void> _saveCache(List<LocalSong> songs) async {
     try {
       final json = jsonEncode(songs.map((s) => s.toJson()).toList());
       await File(_cachePath).writeAsString(json);
@@ -44,7 +44,7 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
 
     try {
       final jsonList = await _api.getSongList();
-      final songs = jsonList.map((j) => Song.fromJson(j)).toList();
+      final songs = jsonList.map((j) => LocalSong.fromJson(j)).toList();
       _saveCache(songs);
       state = AsyncData(songs);
     } catch (e, st) {
@@ -63,7 +63,7 @@ class SongListNotifier extends StateNotifier<AsyncValue<List<Song>>> {
 }
 
 final songListProvider =
-    StateNotifierProvider<SongListNotifier, AsyncValue<List<Song>>>((ref) {
+    StateNotifierProvider<SongListNotifier, AsyncValue<List<LocalSong>>>((ref) {
   final api = ref.read(apiClientProvider);
   return SongListNotifier(api);
 });

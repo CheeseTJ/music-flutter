@@ -66,8 +66,8 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
     setState(() => _records = []);
   }
 
-  Song? _toSong(PlayRecord r, List<Song> songList) {
-    return songList.cast<Song?>().firstWhere(
+  LocalSong? _toSong(PlayRecord r, List<LocalSong> songList) {
+    return songList.cast<LocalSong?>().firstWhere(
       (s) => s?.id == r.songId,
       orElse: () => null,
     );

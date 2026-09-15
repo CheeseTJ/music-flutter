@@ -15,7 +15,7 @@ import 'package:music_app/features/collection/providers/song_list_provider.dart'
 import 'package:music_app/features/import/models/song.dart';
 import 'package:music_app/features/import/music_manager.dart';
 import 'package:music_app/data/datasources/remote/api_client.dart';
-import 'package:music_app/data/models/song.dart' as local_song;
+import 'package:music_app/data/models/song.dart';
 import 'package:music_app/core/utils/settings.dart';
 import 'package:music_app/core/widgets/pearl_toast.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
@@ -99,11 +99,11 @@ class InternetSearchPage extends ConsumerStatefulWidget {
 class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   final _searchCtrl = TextEditingController();
   final _focusNode = FocusNode();
-  List<Song> _results = [];
-  List<local_song.Song> _localResults = [];
+  List<OnlineSong> _results = [];
+  List<LocalSong> _localResults = [];
   bool _loading = false;
   String _error = '';
-  /// Song currently being imported: key is "${platform}|${id}" so multiple
+  /// OnlineSong currently being imported: key is "${platform}|${id}" so multiple
   /// tiles can be in different import states (one loading, one idle, one
   /// failed). `null` means no active import.
   String? _importingSongKey;
@@ -181,8 +181,8 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
       _searchDebounce = null;
       if (!mounted) return;
       setState(() {
-        _results = <Song>[];
-        _localResults = <local_song.Song>[];
+        _results = <OnlineSong>[];
+        _localResults = <LocalSong>[];
         _error = '';
         _loading = false;
       });
@@ -232,14 +232,14 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) {
       if (_localResults.isNotEmpty) {
-        setState(() => _localResults = <local_song.Song>[]);
+        setState(() => _localResults = <LocalSong>[]);
       }
       return;
     }
     final songs = ref.read(songListProvider).valueOrNull;
     if (songs == null) {
       if (_localResults.isNotEmpty) {
-        setState(() => _localResults = <local_song.Song>[]);
+        setState(() => _localResults = <LocalSong>[]);
       }
       return;
     }
@@ -275,7 +275,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     });
   }
 
-  Future<void> _doPlay(Song song) async {
+  Future<void> _doPlay(OnlineSong song) async {
     final playingUrlId = ref.read(playerProvider.notifier).playingUrlId;
     final songId = '${song.platform}|${song.id}';
     if (songId == playingUrlId) {
@@ -306,7 +306,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 
   /// 导入前弹出音质选择（来自搜索结果的 qualityOptions），
   /// 未提供音质选项时直接按默认档导入。
-  Future<void> _doImport(Song song) async {
+  Future<void> _doImport(OnlineSong song) async {
     final mgr = ref.read(musicManagerProvider);
     final options = mgr.qualityOptionsOf(song);
     String? quality;
@@ -317,7 +317,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     await _importWithQuality(song, quality);
   }
 
-  Future<String?> _pickQuality(Song song, List<Map<String, dynamic>> options) {
+  Future<String?> _pickQuality(OnlineSong song, List<Map<String, dynamic>> options) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return showModalBottomSheet<String>(
       context: context,
@@ -372,7 +372,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
     );
   }
 
-  Future<void> _importWithQuality(Song song, String? quality) async {
+  Future<void> _importWithQuality(OnlineSong song, String? quality) async {
     final key = '${song.platform}|${song.id}';
     // Re-tap the same tile or tap another tile while one is in flight:
     // the original behavior disabled all imports while one was running,
@@ -696,7 +696,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 }
 
 class _ResultTile extends StatelessWidget {
-  final Song song;
+  final OnlineSong song;
   final bool isDark;
   final VoidCallback onTap;
   final VoidCallback onImport;
@@ -1016,7 +1016,7 @@ class _OnlineErrorRow extends StatelessWidget {
 }
 
 class _LocalResultTile extends StatelessWidget {
-  final local_song.Song song;
+  final LocalSong song;
   final bool isDark;
   final VoidCallback onTap;
   final bool isPlaying;

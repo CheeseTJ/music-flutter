@@ -40,8 +40,8 @@ class PlayerState {
 class PlayerController extends StateNotifier<PlayerState> {
   MusicAudioHandler _handler;
   final ApiClient _apiClient;
-  Song? _currentSong;
-  List<Song> _playlist = [];
+  LocalSong? _currentSong;
+  List<LocalSong> _playlist = [];
   int _currentIndex = -1;
 
   String? _playingUrlId;
@@ -126,14 +126,14 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   MusicAudioHandler get handler => _handler;
   AudioPlayer get player => _handler.player;
-  Song? get currentSong => _currentSong;
+  LocalSong? get currentSong => _currentSong;
   Duration get position => _handler.position;
   Duration? get duration => _handler.duration;
   int get playMode => state.playMode;
   LrcParser? get lyric => _lyric;
   bool get lyricLoading => state.lyricLoading;
   bool get lyricFailed => state.lyricFailed;
-  void setPlaylist(List<Song> songs) {
+  void setPlaylist(List<LocalSong> songs) {
     _playlist = songs;
     // 修正 _currentIndex，解决冷启动恢复时 setPlaylist 晚于 load 导致的索引错位
     if (_currentSong != null) {
@@ -142,7 +142,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     }
   }
 
-  Future<void> load(Song song) async {
+  Future<void> load(LocalSong song) async {
     try {
       await _loadSongInternal(song);
       // 先挂监听：playingStream 订阅后会立即推送当前值，能把状态拉回真实值
@@ -157,7 +157,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     }
   }
 
-  Future<void> play(Song song) async {
+  Future<void> play(LocalSong song) async {
     try {
       await _loadSongInternal(song);
       await _handler.play();
@@ -172,7 +172,7 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   String? _lastCoverUrl;
 
-  Future<void> _loadSongInternal(Song song) async {
+  Future<void> _loadSongInternal(LocalSong song) async {
     final index = _playlist.indexWhere((s) => s.id == song.id);
     if (index >= 0) {
       _currentIndex = index;
@@ -367,7 +367,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     try {
       state = state.copyWith(phase: PlayerPhase.loading);
       final songId = int.tryParse(id ?? '') ?? 0;
-      _currentSong = Song(id: songId, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
+      _currentSong = LocalSong(id: songId, title: title, artist: artist, album: '', format: '', duration: 0, size: 0, createdAt: 0);
       _lyric = (lyric != null && lyric.isNotEmpty) ? LrcParser.parse(lyric) : null;
       _currentLyricIndex = -1;
       _playingUrlId = (platform != null && id != null) ? '$platform|$id' : null;

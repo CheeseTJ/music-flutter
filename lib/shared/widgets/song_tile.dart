@@ -9,7 +9,7 @@ import '../../core/network/platform_cover_service.dart';
 import 'pearl_cover.dart';
 
 class SongTile extends ConsumerStatefulWidget {
-  final Song song;
+  final LocalSong song;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool isPlaying;
@@ -82,7 +82,7 @@ class _SongTileState extends ConsumerState<SongTile>
     }
   }
 
-  Future<void> _fetchCover(Song song) async {
+  Future<void> _fetchCover(LocalSong song) async {
     final id = song.id;
     final path = await const PlatformCoverService().fetch(
       song.type,

@@ -41,7 +41,7 @@ GoRouter buildRouter() {
         parentNavigatorKey: _rootKey,
         pageBuilder: (context, state) {
           final song = state.extra;
-          if (song is! Song) {
+          if (song is! LocalSong) {
             return _invalidPage(state, 'Invalid player target');
           }
           return CustomTransitionPage(
@@ -72,7 +72,7 @@ GoRouter buildRouter() {
         parentNavigatorKey: _rootKey,
         pageBuilder: (context, state) {
           final song = state.extra;
-          if (song is! Song) {
+          if (song is! LocalSong) {
             return _invalidPage(state, 'Invalid lyrics target');
           }
           return CustomTransitionPage(

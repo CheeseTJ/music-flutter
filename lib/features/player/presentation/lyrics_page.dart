@@ -7,7 +7,7 @@ import 'widgets/lyrics_scroller.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 
 class LyricsPage extends ConsumerStatefulWidget {
-  final Song song;
+  final LocalSong song;
   const LyricsPage({super.key, required this.song});
 
   @override

@@ -123,7 +123,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     );
   }
 
-  Future<void> _fetchCover(Song song) async {
+  Future<void> _fetchCover(LocalSong song) async {
     final url = await const PlatformCoverService().fetch(song.type, song.title, song.artist);
     if (mounted && song.id == _lastSongId) {
       setState(() => _coverUrl = url);
