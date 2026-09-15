@@ -782,20 +782,12 @@ class _ResultTile extends StatelessWidget {
                                       : _placeholderIcon(badgeColor, Icons.music_note_rounded),
                                 ),
                               ),
-                              // 来源是只读属性，做成封面角标，不再和播放/下载挤在一行
+                              // 来源是只读属性，做成封面角标，不再和播放/下载挤在一行。
+                              // 平台图标本身（SVG）就带底色方块，所以不再垫一层白色圆角底。
                               Positioned(
                                 left: -3,
                                 bottom: -3,
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: PearlColors.bgPrimary(isDark),
-                                    borderRadius: BorderRadius.circular(7),
-                                  ),
-                                  child: MusicPlatformMeta.iconCached(song.platform, 14),
-                                ),
+                                child: MusicPlatformMeta.iconCached(song.platform, 20),
                               ),
                             ],
                           ),

@@ -34,8 +34,8 @@ class PearlToast {
 
   static const Duration _defaultDuration = Duration(seconds: 3);
 
-  /// 当前提示的移除器；插入新的提示时用它顶掉旧的
-  static VoidCallback? _dismissCurrent;
+  /// 当前提示；插入新的提示时用它顶掉旧的
+  static _ToastHandle? _current;
 
   static void show(
     BuildContext context,
@@ -47,20 +47,21 @@ class PearlToast {
     if (overlay == null) return;
 
     // 同一时刻只留一个：新的直接顶掉旧的（不做退场动画，避免叠两层）
-    _dismissCurrent?.call();
-    _dismissCurrent = null;
+    _current?.remove();
 
-    late final OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (_) => _PearlToastView(
-        message: message,
-        type: type,
-        duration: duration,
-        onGone: () => _remove(entry),
+    late final _ToastHandle handle;
+    handle = _ToastHandle(
+      OverlayEntry(
+        builder: (_) => _PearlToastView(
+          message: message,
+          type: type,
+          duration: duration,
+          onGone: handle.remove,
+        ),
       ),
     );
-    overlay.insert(entry);
-    _dismissCurrent = () => _remove(entry);
+    _current = handle;
+    overlay.insert(handle.entry);
   }
 
   static void success(
@@ -83,10 +84,24 @@ class PearlToast {
     Duration duration = _defaultDuration,
   }) =>
       show(context, message, type: PearlToastType.error, duration: duration);
+}
 
-  /// 幂等移除：退场动画结束时和「被新提示顶掉」时会各调一次
-  static void _remove(OverlayEntry entry) {
-    if (entry.mounted) entry.remove();
+/// 一次提示的句柄，保证 [OverlayEntry] 只被移除一次。
+///
+/// 不能用 `entry.mounted` 来判断能不能移除：同一帧里刚 `insert`、还没 build 的
+/// entry，其 `mounted` 是 false，会被误判成"已经移除"，于是新提示顶不掉旧提示，
+/// 几个提示会叠在一起。这里用一个显式标记代替。
+/// （`OverlayEntry.remove()` 本身允许在未 build 时调用，只有重复调用才会断言。）
+class _ToastHandle {
+  _ToastHandle(this.entry);
+
+  final OverlayEntry entry;
+  bool _removed = false;
+
+  void remove() {
+    if (_removed) return;
+    _removed = true;
+    entry.remove();
   }
 }
 
@@ -155,9 +170,9 @@ class _PearlToastViewState extends State<_PearlToastView>
     final color = _semanticColor(type, isDark);
     final isNeutral = type == PearlToastType.info;
 
-    final border = isNeutral
-        ? PearlElevation.border(PearlLayer.overlay, isDark)
-        : color.withValues(alpha: isDark ? 0.42 : 0.36);
+    // 描边一律用中性细线：彩色描边在这个胶囊上只剩上下两条横线，
+    // 看着像一条多余的"黄线"。语义交给图标和底色表达。
+    final border = PearlElevation.border(PearlLayer.overlay, isDark);
 
     return Align(
       alignment: Alignment.topCenter,
@@ -168,7 +183,12 @@ class _PearlToastViewState extends State<_PearlToastView>
           left: 16,
           right: 16,
         ),
-        child: SlideTransition(
+        // 裸 OverlayEntry 之上没有 Material / DefaultTextStyle 祖先，Text 会退化成
+        // 框架的 DefaultTextStyle.fallback()，在文字下方渲染出两条黄色基线。
+        // showDialog / showModalBottomSheet 自带一层 Material 所以不会，这里补上。
+        child: Material(
+          type: MaterialType.transparency,
+          child: SlideTransition(
           position: _slide,
           child: FadeTransition(
             opacity: _fade,
@@ -193,7 +213,8 @@ class _PearlToastViewState extends State<_PearlToastView>
                         color: isNeutral
                             ? PearlElevation.fill(PearlLayer.overlay, isDark)
                             : Color.alphaBlend(
-                                color.withValues(alpha: isDark ? 0.18 : 0.16),
+                                // 描边去掉后，语义主要靠这层底色，所以给足一点
+                                color.withValues(alpha: isDark ? 0.22 : 0.20),
                                 PearlElevation.fill(PearlLayer.overlay, isDark),
                               ),
                         borderRadius: BorderRadius.circular(999),
@@ -224,6 +245,7 @@ class _PearlToastViewState extends State<_PearlToastView>
                 ),
               ),
             ),
+          ),
           ),
         ),
       ),
