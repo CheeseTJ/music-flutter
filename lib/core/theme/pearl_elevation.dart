@@ -30,18 +30,29 @@ class PearlElevation {
   PearlElevation._();
 
   /// 表面填充色（数值越大越"高"）
+  ///
+  /// 浅色的 float / nav 比 overlay 更不透明：这两层常驻在滚动列表之上，
+  /// 不能用背景模糊（见 [blurBackdrop]），只能靠填充本身把内容压住。
   static Color fill(PearlLayer layer, bool isDark) {
     switch (layer) {
       case PearlLayer.inset:
         return isDark ? const Color(0x17FFFFFF) : const Color(0xD9FFFFFF);
       case PearlLayer.float:
-        return isDark ? const Color(0x1AFFFFFF) : const Color(0xE0FFFFFF);
+        return isDark ? const Color(0x1AFFFFFF) : const Color(0xECFFFFFF);
       case PearlLayer.nav:
-        return isDark ? const Color(0x1CFFFFFF) : const Color(0xE6FFFFFF);
+        return isDark ? const Color(0x1CFFFFFF) : const Color(0xF0FFFFFF);
       case PearlLayer.overlay:
         return isDark ? const Color(0x29FFFFFF) : const Color(0xF7FFFFFF);
     }
   }
+
+  /// 常驻浮层（迷你播放器 / 悬浮 tab bar）要不要用 BackdropFilter。
+  ///
+  /// 只有深色需要：这两层压在滚动列表上，一旦开模糊，滚动期间每帧都要离屏
+  /// 渲染再回读背景做卷积 —— 这是列表掉帧的主要来源之一。而浅色填充本来就
+  /// 接近不透明（float 92% / nav 94%），模糊只是在磨剩下那一成，收益远小于
+  /// 代价，所以浅色直接不模糊。深色填充只有 10% 左右，模糊才是玻璃感的来源。
+  static bool blurBackdrop(bool isDark) => isDark;
 
   /// 描边色。浅色下必须是黑，白色描边压在近白底上等于没有。
   static Color border(PearlLayer layer, bool isDark) {

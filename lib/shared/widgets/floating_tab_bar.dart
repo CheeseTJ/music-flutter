@@ -1,8 +1,8 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../core/animation/pearl_motion.dart';
 import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_elevation.dart';
+import '../../core/widgets/pearl_glass.dart';
 import '../../core/widgets/upload_button.dart';
 
 class FloatingTabBar extends StatefulWidget {
@@ -54,8 +54,9 @@ class _FloatingTabBarState extends State<FloatingTabBar> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(radius),
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                child: PearlGlass(
+                  isDark: isDark,
+                  sigma: 32,
                   child: Container(
                     height: tabHeight,
                     decoration: BoxDecoration(

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_elevation.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
+import '../../core/widgets/pearl_glass.dart';
 import '../../core/widgets/pearl_loading.dart';
 import '../../features/player/providers/player_provider.dart';
 import 'pearl_cover.dart';
@@ -51,8 +51,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(PearlElevation.radius(PearlLayer.float)),
-            child: BackdropFilter(
-              filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            child: PearlGlass(
+              isDark: isDark,
               child: Container(
                 height: 68,
                 decoration: BoxDecoration(
