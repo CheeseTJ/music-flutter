@@ -18,6 +18,7 @@ import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 import '../../../core/widgets/pearl_loading.dart';
+import '../../../core/widgets/pearl_empty_state.dart';
 
 enum FilterOption { all, noLyric, duplicates, sortByName, recent }
 
@@ -644,27 +645,11 @@ class _EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.headphones_rounded,
-              size: 56,
-              color: PearlColors.textDisabled(isDark)),
-          const SizedBox(height: 16),
-          Text(L.s.emptyTitle,
-              style: TextStyle(
-                fontSize: 16,
-                color: PearlColors.textSecondary(isDark),
-              )),
-          const SizedBox(height: 6),
-          Text(L.s.emptyHint,
-              style: TextStyle(
-                fontSize: 13,
-                color: PearlColors.textDisabled(isDark),
-              )),
-        ],
-      ),
+    return PearlEmptyState(
+      isDark: isDark,
+      icon: Icons.headphones_rounded,
+      title: L.s.emptyTitle,
+      hint: L.s.emptyHint,
     );
   }
 }
@@ -676,29 +661,19 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.cloud_off_rounded, size: 56,
-              color: const Color(0xFFFF7A9E)),
-          const SizedBox(height: 16),
-          Text(L.s.loadFailed,
-              style: TextStyle(
-                fontSize: 16,
-                color: PearlColors.textSecondary(isDark),
-              )),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onRetry,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: PearlColors.accent(isDark),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            ),
-            child: Text(L.s.retry),
-          ),
-        ],
+    return PearlEmptyState(
+      isDark: isDark,
+      icon: Icons.cloud_off_rounded,
+      iconColor: const Color(0xFFFF7A9E),
+      title: L.s.loadFailed,
+      action: ElevatedButton(
+        onPressed: onRetry,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: PearlColors.accent(isDark),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+        child: Text(L.s.retry),
       ),
     );
   }

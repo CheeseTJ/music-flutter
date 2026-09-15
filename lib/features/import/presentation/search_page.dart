@@ -22,6 +22,7 @@ import 'package:music_app/shared/widgets/mini_player.dart';
 import 'package:music_app/shared/widgets/pearl_cover.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 import 'package:music_app/core/widgets/pearl_loading.dart';
+import 'package:music_app/core/widgets/pearl_empty_state.dart';
 
 
 
@@ -620,20 +621,11 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
 
     // Both lists empty and not loading \u2192 empty state.
     if (!hasLocal && !hasOnline && !_loading && _error.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off_rounded, size: 48,
-                color: PearlColors.textDisabled(isDark)),
-            const SizedBox(height: 12),
-            Text(L.s.noResult,
-                style: TextStyle(fontSize: 15, color: PearlColors.textSecondary(isDark))),
-            const SizedBox(height: 4),
-            Text(L.s.noResultHint,
-                style: TextStyle(fontSize: 13, color: PearlColors.textDisabled(isDark))),
-          ],
-        ),
+      return PearlEmptyState(
+        isDark: isDark,
+        icon: Icons.search_off_rounded,
+        title: L.s.noResult,
+        hint: L.s.noResultHint,
       );
     }
 

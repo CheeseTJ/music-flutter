@@ -15,6 +15,7 @@ import '../../../core/network/platform_cover_service.dart';
 import '../../player/providers/player_provider.dart';
 import '../../collection/providers/song_list_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
+import 'package:music_app/core/widgets/pearl_empty_state.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   final Song song;
@@ -695,7 +696,6 @@ class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
     final isDark = widget.isDark;
     final accent = PearlColors.accent(isDark);
     final textS = PearlColors.textSecondary(isDark);
-    final textD = PearlColors.textDisabled(isDark);
     final statusBarHeight = MediaQuery.of(context).padding.top;
 
     final slideAnim = Tween<Offset>(
@@ -742,21 +742,11 @@ class _LyricsOverlayState extends ConsumerState<_LyricsOverlay> {
                   ),
                   if (lyric == null || lyric.lines.isEmpty)
                     Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.lyrics_outlined, size: 56, color: textD),
-                            const SizedBox(height: 16),
-                            Text(L.s.noLyric, style: TextStyle(color: textS, fontSize: 16)),
-                            if (widget.song.hasLyric)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(L.s.instrumental,
-                                    style: TextStyle(color: textD, fontSize: 13)),
-                              ),
-                          ],
-                        ),
+                      child: PearlEmptyState(
+                        isDark: isDark,
+                        icon: Icons.lyrics_outlined,
+                        title: L.s.noLyric,
+                        hint: widget.song.hasLyric ? L.s.instrumental : null,
                       ),
                     )
                   else
@@ -865,9 +855,13 @@ void _showPlaylistSheet(BuildContext context, WidgetRef ref) {
               SizedBox(
                 height: 320,
                 child: songs.isEmpty
-                    ? Center(
-                        child: Text(L.s.noSongs,
-                            style: TextStyle(color: PearlColors.textSecondary(isDark))))
+                    ? PearlEmptyState(
+                        isDark: isDark,
+                        compact: true,
+                        icon: Icons.queue_music_rounded,
+                        title: L.s.noSongs,
+                        hint: L.s.playlistEmptyHint,
+                      )
                     : ListView.builder(
                         itemCount: songs.length,
                         itemBuilder: (_, i) {

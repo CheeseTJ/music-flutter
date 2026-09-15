@@ -27,6 +27,7 @@ abstract class AppStrings {
   String get instrumental;
   String get playlist;
   String get noSongs;
+  String get playlistEmptyHint;
   String get filterDefault;
   String get filterNoLyric;
   String get filterDuplicates;
@@ -51,6 +52,7 @@ abstract class AppStrings {
   String get confirm;
   String get playHistory;
   String get noHistory;
+  String get historyEmptyHint;
   String get library;
   String get librarySub;
   String get statSongs;
@@ -143,6 +145,8 @@ class AppStringsZh extends AppStrings {
   @override
   String get noSongs => '暂无歌曲';
   @override
+  String get playlistEmptyHint => '从曲库选一首播放，这里就会有了';
+  @override
   String get filterDefault => '默认';
   @override
   String get filterNoLyric => '缺歌词';
@@ -190,6 +194,8 @@ class AppStringsZh extends AppStrings {
   String get playHistory => '播放记录';
   @override
   String get noHistory => '暂无播放记录';
+  @override
+  String get historyEmptyHint => '听过的歌会出现在这里';
   @override
   String get library => '曲库';
   @override
@@ -339,6 +345,8 @@ class AppStringsEn extends AppStrings {
   @override
   String get noSongs => 'No songs';
   @override
+  String get playlistEmptyHint => 'Play something from your library to see it here';
+  @override
   String get filterDefault => 'Default';
   @override
   String get filterNoLyric => 'Missing lyrics';
@@ -386,6 +394,8 @@ class AppStringsEn extends AppStrings {
   String get playHistory => 'Play history';
   @override
   String get noHistory => 'No play history yet';
+  @override
+  String get historyEmptyHint => 'Songs you play will show up here';
   @override
   String get library => 'Library';
   @override

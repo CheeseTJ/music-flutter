@@ -8,6 +8,7 @@ import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 import '../../../core/widgets/pearl_loading.dart';
+import '../../../core/widgets/pearl_empty_state.dart';
 
 class PlayHistoryPage extends ConsumerStatefulWidget {
   const PlayHistoryPage({super.key});
@@ -95,14 +96,11 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
                   size: 36, strokeWidth: 4, color: PearlColors.accent(isDark)),
             )
           : _records.isEmpty
-              ? Center(
-                  child: Text(
-                    L.s.noHistory,
-                    style: TextStyle(
-                      color: PearlColors.textSecondary(isDark),
-                      fontSize: 14,
-                    ),
-                  ),
+              ? PearlEmptyState(
+                  isDark: isDark,
+                  icon: Icons.history_rounded,
+                  title: L.s.noHistory,
+                  hint: L.s.historyEmptyHint,
                 )
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 16),
