@@ -470,6 +470,8 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
                           song: song,
                           isPlaying: isCurrent,
                           isPaused: playerPhase == PlayerPhase.paused,
+                          isLoading:
+                              isCurrent && playerPhase == PlayerPhase.loading,
                           onTap: () {
                             ref.read(playerProvider.notifier).setPlaylist(songs);
                             context.push('/player', extra: song);

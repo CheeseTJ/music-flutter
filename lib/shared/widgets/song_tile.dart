@@ -5,6 +5,7 @@ import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_theme.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
+import '../../core/widgets/pearl_loading.dart';
 import 'pearl_cover.dart';
 
 class SongTile extends StatefulWidget {
@@ -13,6 +14,10 @@ class SongTile extends StatefulWidget {
   final VoidCallback? onLongPress;
   final bool isPlaying;
   final bool isPaused;
+
+  /// 这首正在取链/加载。此时播放器里装的还是上一首，所以按钮转圈且不可点 ——
+  /// 否则按下去会把上一首放出来（冷启动恢复的场景尤其明显）。
+  final bool isLoading;
 
   /// 当前曲目的播放/暂停按钮；为 null 时不渲染这个按钮
   final VoidCallback? onPlayPause;
@@ -27,6 +32,7 @@ class SongTile extends StatefulWidget {
     this.onLongPress,
     this.isPlaying = false,
     this.isPaused = false,
+    this.isLoading = false,
     this.onPlayPause,
     this.onMore,
   });
@@ -169,6 +175,7 @@ class _SongTileState extends State<SongTile> {
                     icon: isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                     color: accent,
                     background: accent.withValues(alpha: 0.12),
+                    loading: widget.isLoading,
                     onTap: widget.onPlayPause,
                   ),
                 // 更多：打开操作面板
@@ -247,12 +254,16 @@ class _TileIconButton extends StatelessWidget {
     required this.onTap,
     required this.color,
     this.background,
+    this.loading = false,
   });
 
   final IconData icon;
   final VoidCallback? onTap;
   final Color color;
   final Color? background;
+
+  /// 加载中：显示转圈并禁止点击
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -262,7 +273,7 @@ class _TileIconButton extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: loading ? null : onTap,
           borderRadius: BorderRadius.circular(10),
           child: Center(
             child: Container(
@@ -272,7 +283,14 @@ class _TileIconButton extends StatelessWidget {
                 color: background,
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(icon, size: 19, color: color),
+              child: loading
+                  // 这里必须用 Padding 收窄：Container 的 32×32 是紧约束，
+                  // PearlLoading 自己的 size 会被强制撑成 32。
+                  ? Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: PearlLoading(size: 16, color: color),
+                    )
+                  : Icon(icon, size: 19, color: color),
             ),
           ),
         ),

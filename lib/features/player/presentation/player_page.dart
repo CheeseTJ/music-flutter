@@ -16,6 +16,7 @@ import '../../player/providers/player_provider.dart';
 import '../../collection/providers/song_list_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 import 'package:music_app/core/widgets/pearl_empty_state.dart';
+import 'package:music_app/core/widgets/pearl_loading.dart';
 
 class PlayerPage extends ConsumerStatefulWidget {
   final LocalSong song;
@@ -395,6 +396,9 @@ class _PlayerControlsBar extends ConsumerWidget {
     final notifier = ref.watch(playerProvider.notifier);
     final state = ref.watch(playerProvider);
     final isPlaying = state.isPlaying;
+    // 加载期间播放器里装的还是上一首（冷启动恢复的那首就是典型），
+    // 此时按钮必须转圈且不可点，否则按下去会把上一首放出来。
+    final isLoading = state.phase == PlayerPhase.loading;
     final accent = PearlColors.accent(isDark);
     final textP = PearlColors.textPrimary(isDark);
 
@@ -416,7 +420,7 @@ class _PlayerControlsBar extends ConsumerWidget {
             onPressed: () => notifier.previous(forced: true),
           ),
           GestureDetector(
-            onTap: () => notifier.togglePlayPause(),
+            onTap: isLoading ? null : () => notifier.togglePlayPause(),
             child: Container(
               width: 72,
               height: 72,
@@ -440,14 +444,20 @@ class _PlayerControlsBar extends ConsumerWidget {
                   switchOutCurve: PearlMotion.standardIn,
                   transitionBuilder: (child, anim) =>
                       ScaleTransition(scale: anim, child: child),
-                  child: Icon(
-                    isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    key: ValueKey<bool>(isPlaying),
-                    size: 36,
-                    color: Colors.white,
-                  ),
+                  child: isLoading
+                      ? const PearlLoading(
+                          size: 30,
+                          strokeWidth: 3,
+                          color: Colors.white,
+                        )
+                      : Icon(
+                          isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          key: ValueKey<bool>(isPlaying),
+                          size: 36,
+                          color: Colors.white,
+                        ),
                 ),
               ),
             ),

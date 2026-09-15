@@ -158,11 +158,14 @@ class PlayerController extends StateNotifier<PlayerState> {
     _customNotifSub = CustomNotificationService.onAction.listen((action) {
       switch (action) {
         case 'play':
+          // 加载期间播放器里还是上一首，见 _controlsReady
+          if (!_controlsReady) break;
           _handler.play();
           state = state.copyWith(phase: PlayerPhase.playing);
           CustomNotificationService.updatePlayState(true);
           break;
         case 'pause':
+          if (!_controlsReady) break;
           _handler.pause();
           state = state.copyWith(phase: PlayerPhase.paused);
           CustomNotificationService.updatePlayState(false);
@@ -536,7 +539,16 @@ class PlayerController extends StateNotifier<PlayerState> {
     }
   }
 
+  /// 播放控制是否可用。
+  ///
+  /// 加载期间（取链 / 取封面还没回来）播放器里装的还是**上一首**，任何
+  /// play/pause 都会作用到错误的歌上。冷启动恢复后的典型表现：点了新歌、
+  /// 新歌还在加载，这时按播放会把恢复出来的那首放出来，等新歌加载完才切成
+  /// 新歌。所以这段窗口直接不响应播放控制。
+  bool get _controlsReady => state.phase != PlayerPhase.loading;
+
   void togglePlayPause() {
+    if (!_controlsReady) return;
     if (_handler.playing) {
       _handler.pause();
       state = state.copyWith(phase: PlayerPhase.paused);
