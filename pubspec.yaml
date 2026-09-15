@@ -1,7 +1,7 @@
 name: music_app
 description: Personal Cloud Music App
 publish_to: 'none'
-version: 1.1.9+10
+version: 1.1.10+11
 
 environment:
   sdk: ^3.5.0
@@ -30,6 +30,12 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.14.1
+
+# objective_c 9.6.1 的 build hook 用了 Architecture.arm64e，当前 Dart SDK(3.13.3)
+# 里没有这个枚举成员，会让 assembleRelease 的 native assets 阶段直接编译失败。
+# pubspec.lock 没有入库，CI 每次全新解析就会拉到它，所以这里钉住可用的 9.5.0。
+dependency_overrides:
+  objective_c: 9.5.0
 
 flutter_launcher_icons:
   android: true
