@@ -19,6 +19,7 @@ import 'package:music_app/data/models/song.dart' as local_song;
 import 'package:music_app/core/utils/settings.dart';
 import 'package:music_app/core/widgets/pearl_toast.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
+import 'package:music_app/shared/widgets/pearl_cover.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 
 
@@ -707,17 +708,6 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   }
 }
 
-Widget _placeholderIcon(Color badgeColor, IconData icon) {
-  return Container(
-    decoration: BoxDecoration(
-      color: badgeColor.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Icon(icon, size: 22, color: badgeColor),
-  );
-}
-
-
 class _ResultTile extends StatelessWidget {
   final Song song;
   final bool isDark;
@@ -741,7 +731,6 @@ class _ResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeColor = MusicPlatformMeta.color(song.platform, isDark);
     final accentColor = PearlColors.accent(isDark);
 
     return Padding(
@@ -777,10 +766,12 @@ class _ResultTile extends StatelessWidget {
                                       ? Image.network(
                                           snap.data!,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              _placeholderIcon(badgeColor, Icons.music_note_rounded),
+                                          errorBuilder: (_, __, ___) => PearlCover(
+                                              isDark: isDark,
+                                              size: PearlCoverSize.compact),
                                         )
-                                      : _placeholderIcon(badgeColor, Icons.music_note_rounded),
+                                      : PearlCover(
+                                          isDark: isDark, size: PearlCoverSize.compact),
                                 ),
                               ),
                               // 来源是只读属性，做成封面角标，不再和播放/下载挤在一行。
@@ -1081,15 +1072,11 @@ class _LocalResultTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.music_note_rounded,
-                      size: 22, color: accent.withValues(alpha: 0.85)),
+                PearlCover(
+                  isDark: isDark,
+                  size: PearlCoverSize.compact,
+                  tint: accent,
+                  highlighted: highlight,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

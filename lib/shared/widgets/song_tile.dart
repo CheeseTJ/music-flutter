@@ -6,6 +6,7 @@ import '../../core/theme/pearl_colors.dart';
 import '../../core/theme/pearl_theme.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
+import 'pearl_cover.dart';
 
 class SongTile extends ConsumerStatefulWidget {
   final Song song;
@@ -192,20 +193,18 @@ class _SongTileState extends ConsumerState<SongTile>
   }
 
   Widget _buildCover(bool isDark, bool isPlaying, bool isPaused) {
-    final accent = PearlColors.accent(isDark);
-
     if (_coverUrl != null) {
       final isLocal = _coverUrl!.startsWith('/') || _coverUrl!.startsWith(r'\');
       final imageWidget = isLocal
           ? Image.file(File(_coverUrl!), width: 56, height: 56, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _coverPlaceholder(accent))
+              errorBuilder: (_, __, ___) => PearlCover(isDark: isDark))
           : CachedNetworkImage(
               imageUrl: _coverUrl!,
               width: 56,
               height: 56,
               fit: BoxFit.cover,
-              placeholder: (_, __) => _coverPlaceholder(accent),
-              errorWidget: (_, __, ___) => _coverPlaceholder(accent),
+              placeholder: (_, __) => PearlCover(isDark: isDark),
+              errorWidget: (_, __, ___) => PearlCover(isDark: isDark),
             );
       return Stack(
         children: [
@@ -239,21 +238,7 @@ class _SongTileState extends ConsumerState<SongTile>
         ],
       );
     }
-    return _coverPlaceholder(accent);
-  }
-
-  Widget _coverPlaceholder(Color accent) {
-    return Container(
-      width: 56,
-      height: 56,
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(PearlTheme.radiusSm),
-      ),
-      child: Center(
-        child: Icon(Icons.music_note_rounded, size: 24, color: accent.withValues(alpha: 0.5)),
-      ),
-    );
+    return PearlCover(isDark: isDark);
   }
 }
 

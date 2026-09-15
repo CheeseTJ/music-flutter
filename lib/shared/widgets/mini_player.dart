@@ -7,6 +7,7 @@ import '../../core/theme/pearl_elevation.dart';
 import '../../data/models/song.dart';
 import '../../core/network/platform_cover_service.dart';
 import '../../features/player/providers/player_provider.dart';
+import 'pearl_cover.dart';
 
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key});
@@ -67,9 +68,11 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                               width: 48,
                               height: 48,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _musicIcon(isDark),
+                              errorBuilder: (_, __, ___) => PearlCover(
+                                  isDark: isDark,
+                                  size: PearlCoverSize.nowPlaying),
                             )
-                          : _musicIcon(isDark),
+                          : PearlCover(isDark: isDark, size: PearlCoverSize.nowPlaying),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -116,27 +119,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _musicIcon(bool isDark) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            PearlColors.accent(isDark),
-            PearlColors.accent(isDark).withValues(alpha: 0.5),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(
-        Icons.music_note_rounded,
-        color: PearlColors.textPrimary(isDark),
-        size: 22,
       ),
     );
   }
