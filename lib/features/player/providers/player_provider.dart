@@ -70,7 +70,9 @@ class PlayerController extends StateNotifier<PlayerState> {
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<dynamic>? _completeSub;
   StreamSubscription<bool>? _playingSub;
-  bool _isSkipping = false;
+  /// 正在进行中的跳转次数。用户主动跳转可以打断上一次（forced），
+  /// 自动切歌则用它挡住重复上报的 completed 事件。
+  int _skipping = 0;
   final _random = Random();
 
   /// 播放请求序号：每发起一次「加载一首歌」就自增。
@@ -122,10 +124,10 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   void _wireHandlerCallbacks() {
     _handler.onSkipToNext = () {
-      if (_playlist.isNotEmpty) next();
+      if (_playlist.isNotEmpty) next(forced: true);
     };
     _handler.onSkipToPrevious = () {
-      if (_playlist.isNotEmpty) previous();
+      if (_playlist.isNotEmpty) previous(forced: true);
     };
   }
 
@@ -145,10 +147,10 @@ class PlayerController extends StateNotifier<PlayerState> {
           CustomNotificationService.updatePlayState(false);
           break;
         case 'skipNext':
-          if (_playlist.isNotEmpty) next();
+          if (_playlist.isNotEmpty) next(forced: true);
           break;
         case 'skipPrev':
-          if (_playlist.isNotEmpty) previous();
+          if (_playlist.isNotEmpty) previous(forced: true);
           break;
       }
     });
@@ -338,7 +340,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   void onSongEnd() {
-    debugPrint('[onSongEnd] playMode=${state.playMode} playlist=${_playlist.length} idx=$_currentIndex isSkipping=$_isSkipping');
+    debugPrint('[onSongEnd] playMode=${state.playMode} playlist=${_playlist.length} idx=$_currentIndex skipping=$_skipping');
     if (state.playMode == 1) {
       _handler.seek(Duration.zero);
       _handler.play();
@@ -358,9 +360,17 @@ class PlayerController extends StateNotifier<PlayerState> {
     return idx;
   }
 
-  Future<void> next() async {
-    if (_playlist.isEmpty || _isSkipping) return;
-    _isSkipping = true;
+  /// 跳到下一首。
+  ///
+  /// [forced] = 用户主动触发（点按钮、按通知栏的下一首）。加载期间 phase 是
+  /// loading，用户会连点，所以必须允许打断上一次还没加载完的跳转 —— 上一次
+  /// 的结果会被 _loadSeq 作废掉。
+  /// 自动切歌（一首播完）不传 forced：继续挡着，避免重复上报的 completed
+  /// 事件让一次播完连跳两首。
+  Future<void> next({bool forced = false}) async {
+    if (_playlist.isEmpty) return;
+    if (!forced && _skipping > 0) return;
+    _skipping++;
     try {
       await _handler.stop();
       state = state.copyWith(phase: PlayerPhase.paused);
@@ -385,13 +395,15 @@ class PlayerController extends StateNotifier<PlayerState> {
         debugPrint('[next] end, no loop');
       }
     } finally {
-      _isSkipping = false;
+      _skipping--;
     }
   }
 
-  Future<void> previous() async {
-    if (_playlist.isEmpty || _isSkipping) return;
-    _isSkipping = true;
+  /// 跳到上一首。参数含义同 [next]。
+  Future<void> previous({bool forced = false}) async {
+    if (_playlist.isEmpty) return;
+    if (!forced && _skipping > 0) return;
+    _skipping++;
     try {
       await _handler.stop();
       state = state.copyWith(phase: PlayerPhase.paused);
@@ -408,7 +420,7 @@ class PlayerController extends StateNotifier<PlayerState> {
         await play(_playlist[_currentIndex]);
       }
     } finally {
-      _isSkipping = false;
+      _skipping--;
     }
   }
 

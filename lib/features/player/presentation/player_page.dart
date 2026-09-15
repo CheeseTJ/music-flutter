@@ -413,7 +413,7 @@ class _PlayerControlsBar extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(Icons.skip_previous_rounded, size: 32, color: textP),
-            onPressed: () => notifier.previous(),
+            onPressed: () => notifier.previous(forced: true),
           ),
           GestureDetector(
             onTap: () => notifier.togglePlayPause(),
@@ -454,7 +454,7 @@ class _PlayerControlsBar extends ConsumerWidget {
           ),
           IconButton(
             icon: Icon(Icons.skip_next_rounded, size: 32, color: textP),
-            onPressed: () => notifier.next(),
+            onPressed: () => notifier.next(forced: true),
           ),
           _SmallBtn(
           icon: Icons.queue_music_rounded,
