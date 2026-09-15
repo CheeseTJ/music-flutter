@@ -21,6 +21,7 @@ import 'package:music_app/core/widgets/pearl_toast.dart';
 import 'package:music_app/shared/widgets/mini_player.dart';
 import 'package:music_app/shared/widgets/pearl_cover.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
+import 'package:music_app/core/widgets/pearl_loading.dart';
 
 
 
@@ -676,13 +677,7 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
             // Small inline spinner next to the header so the user
             // sees feedback before any rows land.
             trailing: _loading
-                ? SizedBox(
-                    width: 12, height: 12,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.6,
-                      color: accent,
-                    ),
-                  )
+                ? PearlLoading(size: 12, strokeWidth: 1.6, color: accent)
                 : null,
           ),
           if (_loading)
@@ -855,8 +850,8 @@ class _ResultTile extends StatelessWidget {
                               child: isImporting
                                   ? const Padding(
                                       padding: EdgeInsets.all(10),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                                      child: PearlLoading(
+                                        size: 16,
                                         color: Color(0xFF44D3FF),
                                       ),
                                     )

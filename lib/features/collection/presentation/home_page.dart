@@ -17,6 +17,7 @@ import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
+import '../../../core/widgets/pearl_loading.dart';
 
 enum FilterOption { all, noLyric, duplicates, sortByName, recent }
 
@@ -420,13 +421,7 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             children: [
               songsAsync.when(
             loading: () => Center(
-              child: SizedBox(
-                width: 24, height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: PearlColors.accent(isDark),
-                ),
-              ),
+              child: PearlLoading(size: 24, color: PearlColors.accent(isDark)),
             ),
             error: (e, _) => _ErrorView(isDark: isDark, onRetry: () => ref.read(songListProvider.notifier).load()),
             data: (songs) {

@@ -7,6 +7,7 @@ import '../../../data/models/song.dart';
 import '../../../shared/widgets/song_tile.dart';
 import '../../collection/providers/song_list_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
+import '../../../core/widgets/pearl_loading.dart';
 
 class PlayHistoryPage extends ConsumerStatefulWidget {
   const PlayHistoryPage({super.key});
@@ -90,9 +91,8 @@ class _PlayHistoryPageState extends ConsumerState<PlayHistoryPage> {
       ),
       body: _loading
           ? Center(
-              child: CircularProgressIndicator(
-                color: PearlColors.accent(isDark),
-              ),
+              child: PearlLoading(
+                  size: 36, strokeWidth: 4, color: PearlColors.accent(isDark)),
             )
           : _records.isEmpty
               ? Center(

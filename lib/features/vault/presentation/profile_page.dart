@@ -16,6 +16,7 @@ import '../../../core/widgets/pearl_toast.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
+import '../../../core/widgets/pearl_loading.dart';
 
 class VaultPage extends ConsumerStatefulWidget {
   const VaultPage({super.key});
@@ -513,12 +514,8 @@ class _ClearCacheRowState extends State<_ClearCacheRow> {
             ),
           ),
           _clearing
-              ? SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: PearlColors.accent(widget.isDark),
-                  ))
+              ? PearlLoading(
+                  size: 20, color: PearlColors.accent(widget.isDark))
               : SizedBox(width: 20),
         ],
       ),
@@ -829,11 +826,7 @@ class _UpdateRowState extends State<_UpdateRow> {
 
   Widget _buildTrailing(bool isDark, Color accent) {
     if (_checking) {
-      return SizedBox(
-        width: 16,
-        height: 16,
-        child: CircularProgressIndicator(strokeWidth: 2, color: accent),
-      );
+      return PearlLoading(size: 16, color: accent);
     }
     return Row(
       mainAxisSize: MainAxisSize.min,
