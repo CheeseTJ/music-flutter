@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:open_filex/open_filex.dart';
 import '../../../core/theme/pearl_colors.dart';
 import '../../../core/theme/pearl_theme.dart';
@@ -14,7 +15,6 @@ import '../../../core/utils/settings.dart';
 import '../../../core/widgets/pearl_toast.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
-import '../providers/app_update_provider.dart';
 
 class VaultPage extends ConsumerStatefulWidget {
   const VaultPage({super.key});
@@ -564,29 +564,39 @@ class _AboutSection extends StatelessWidget {
 // ============================================================
 //  Version + 检查更新（数据来自蒲公英，下载走国内 CDN）
 // ============================================================
-class _UpdateRow extends ConsumerStatefulWidget {
+class _UpdateRow extends StatefulWidget {
   final bool isDark;
   const _UpdateRow({required this.isDark});
 
   @override
-  ConsumerState<_UpdateRow> createState() => _UpdateRowState();
+  State<_UpdateRow> createState() => _UpdateRowState();
 }
 
-class _UpdateRowState extends ConsumerState<_UpdateRow> {
-  /// 下载走的服务实例。检查逻辑已经搬到 appUpdateProvider 里了。
+class _UpdateRowState extends State<_UpdateRow> {
   final AppUpdateService _service = AppUpdateService();
 
+  String _version = '';
+  AppUpdateInfo? _info;
+  bool _checking = false;
   bool _downloading = false;
   bool _expanded = false;
   double _progress = 0;
 
-  // 检查状态在 appUpdateProvider；这里用 read 取当前值，build() 顶部再 watch
-  // 一次订阅变化。检查时机由 ShellPage 启动时统一触发（带 6h 节流）。
-  AppUpdateState get _u => ref.read(appUpdateProvider);
-  bool get _hasUpdate => _u.hasUpdate;
-  bool get _checking => _u.checking;
-  String get _version => _u.currentVersion;
-  AppUpdateInfo? get _info => _u.info;
+  bool get _hasUpdate => _info?.hasUpdate == true;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final pkg = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() => _version = pkg.version);
+    // 进入页面静默检查一次，有新版就直接在行内提示
+    await _check(silent: true);
+  }
 
   void _toast(String msg, {PearlToastType type = PearlToastType.info}) {
     if (!mounted) return;
@@ -594,14 +604,19 @@ class _UpdateRowState extends ConsumerState<_UpdateRow> {
   }
 
   /// 返回是否成功拿到结果。silent 时不打扰用户，只更新行内徽标。
-  Future<bool> _check({bool silent = false, bool force = false}) async {
+  Future<bool> _check({bool silent = false}) async {
+    if (_checking || _downloading || _version.isEmpty) return false;
+    setState(() => _checking = true);
     try {
-      return await ref
-          .read(appUpdateProvider.notifier)
-          .check(silent: silent, force: force);
+      final info = await _service.check(_version);
+      if (!mounted) return false;
+      setState(() => _info = info);
+      return true;
     } catch (e) {
       if (!silent && mounted) _toast('$e', type: PearlToastType.error);
       return false;
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
   }
 
@@ -620,7 +635,7 @@ class _UpdateRowState extends ConsumerState<_UpdateRow> {
       setState(() => _expanded = true);
       return;
     }
-    final ok = await _check(force: true);
+    final ok = await _check();
     if (!mounted || !ok) return;
     if (_hasUpdate) {
       setState(() => _expanded = true);
@@ -667,8 +682,6 @@ class _UpdateRowState extends ConsumerState<_UpdateRow> {
 
   @override
   Widget build(BuildContext context) {
-    // 订阅更新状态：检查结果由 ShellPage 启动时写入
-    ref.watch(appUpdateProvider);
     final isDark = widget.isDark;
     final accent = PearlColors.accent(isDark);
 

@@ -13,7 +13,6 @@ class Settings {
   static const _kShowUploadButton = 'show_upload_button';
   static const _kShowMiniPlayer = 'show_mini_player';
   static const _kPlayMode = 'play_mode';
-  static const _kLastUpdateCheck = 'last_update_check';
   static const _kLang = 'app_lang';
 
   /// 是否显示底栏的"上传"快捷按钮。默认 true。
@@ -48,19 +47,7 @@ class Settings {
     await prefs.setInt(_kPlayMode, value);
   }
 
-  /// 上次「静默检查更新」的时间。用于节流，避免每次冷启动都打蒲公英接口。
-  static Future<DateTime?> getLastUpdateCheck() async {
-    final prefs = await SharedPreferences.getInstance();
-    final ms = prefs.getInt(_kLastUpdateCheck);
-    return ms == null ? null : DateTime.fromMillisecondsSinceEpoch(ms);
-  }
-
-  static Future<void> setLastUpdateCheck(DateTime t) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kLastUpdateCheck, t.millisecondsSinceEpoch);
-  }
-
-  /// 界面语言：'zh' / 'en'。默认跟随系统，首次由 main() 写入。
+  /// 界面语言：'zh' / 'en'。首次启动由 main() 按系统语言写入。
   static Future<String?> getLang() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_kLang);
