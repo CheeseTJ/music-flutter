@@ -6,6 +6,7 @@ import '../../../shared/widgets/floating_tab_bar.dart';
 import '../../../shared/widgets/mini_player.dart';
 import '../../collection/presentation/home_page.dart';
 import '../../vault/presentation/profile_page.dart';
+import '../../vault/providers/app_update_provider.dart';
 import '../../player/providers/player_provider.dart';
 import '../../../core/utils/settings.dart';
 
@@ -18,6 +19,18 @@ class ShellPage extends ConsumerStatefulWidget {
 }
 
 class _ShellPageState extends ConsumerState<ShellPage> {
+  @override
+  void initState() {
+    super.initState();
+    // 启动时静默检查一次更新（内部有 6h 节流）。放在 Shell 而不是 Vault 页的
+    // Version 行里 —— 那行在列表底部、靠 sliver 懒构建触发，什么时候查取决于
+    // 列表长度和视口高度，时机不可预期。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(appUpdateProvider.notifier).check(silent: true);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

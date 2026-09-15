@@ -29,7 +29,9 @@ migrate_working_dir/
 .pub/
 /build/
 coverage/
-pubspec.lock
+# pubspec.lock 入库：这是个 App（不是 library），锁住依赖版本才能保证构建可复现。
+# 之前不入库，CI 每次全新解析依赖，2026-09-15 objective_c 9.6.1 一发布就把
+# assembleRelease 打挂了（详见 pubspec.yaml 里的 dependency_overrides 注释）。
 
 # Symbolication related
 app.*.symbols
