@@ -56,8 +56,6 @@ abstract class AppStrings {
   String get library;
   String storageUsage(String percent, String quota);
   String get storageUnavailable;
-  String get statSongs;
-  String get statLyrics;
   String get settingsTitle;
   String get showUploadButton;
   String get showUploadButtonHint;
@@ -203,10 +201,6 @@ class AppStringsZh extends AppStrings {
   String storageUsage(String percent, String quota) => '已用 $percent · 共 $quota';
   @override
   String get storageUnavailable => '暂时取不到云端占用';
-  @override
-  String get statSongs => '歌曲';
-  @override
-  String get statLyrics => '歌词';
   @override
   String get settingsTitle => '设置';
   @override
@@ -405,10 +399,6 @@ class AppStringsEn extends AppStrings {
   String storageUsage(String percent, String quota) => '$percent used of $quota';
   @override
   String get storageUnavailable => 'Cloud usage unavailable';
-  @override
-  String get statSongs => 'Songs';
-  @override
-  String get statLyrics => 'Lyrics';
   @override
   String get settingsTitle => 'Settings';
   @override

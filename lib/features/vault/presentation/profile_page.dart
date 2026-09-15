@@ -39,12 +39,8 @@ class _VaultPageState extends ConsumerState<VaultPage> {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     final miniPlayerHeight = (hasSong && showMiniPlayer) ? 68.0 + 8.0 : 0.0;
     final bottomPadding = 64.0 + 16.0 + bottomInset + miniPlayerHeight + 16.0;
-    final songsAsync = ref.watch(songListProvider);
     final showUploadButton = ref.watch(showUploadButtonProvider);
 
-    final songs = songsAsync.valueOrNull ?? const [];
-    final totalSongs = songs.length;
-    final totalLyrics = songs.where((s) => s.hasLyric).length;
     // 容量不再由前端按歌曲 size 估算：直接读服务端转发的官方 bucket usage，
     // 那才是真实的云端占用（含歌词对象、孤儿对象和元数据）。
     final storageAsync = ref.watch(storageProvider);
@@ -64,13 +60,6 @@ class _VaultPageState extends ConsumerState<VaultPage> {
                 _StorageHero(
                   storage: storageAsync.valueOrNull,
                   failed: storageAsync.hasError,
-                  isDark: isDark,
-                ),
-                const SizedBox(height: 20),
-
-                _StatsCard(
-                  totalSongs: totalSongs,
-                  totalLyrics: totalLyrics,
                   isDark: isDark,
                 ),
                 const SizedBox(height: 28),
@@ -220,82 +209,6 @@ class _StorageHero extends StatelessWidget {
     if (bytes < 1000 * 1000) return (bytes / 1000).toStringAsFixed(0);
     if (bytes < 1000 * 1000 * 1000) return (bytes / (1000 * 1000)).toStringAsFixed(1);
     return (bytes / (1000 * 1000 * 1000)).toStringAsFixed(2);
-  }
-}
-
-// ============================================================
-//  Stats card: Songs / Lyrics / Duration
-// ============================================================
-class _StatsCard extends StatelessWidget {
-  final int totalSongs;
-  final int totalLyrics;
-  final bool isDark;
-
-  const _StatsCard({
-    required this.totalSongs,
-    required this.totalLyrics,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-      decoration: BoxDecoration(
-        color: PearlColors.glassBgStrong(isDark),
-        borderRadius: BorderRadius.circular(PearlTheme.radiusXl),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _StatCell(label: L.s.statSongs,     value: '$totalSongs', isDark: isDark)),
-          _Divider(isDark: isDark),
-          Expanded(child: _StatCell(label: L.s.statLyrics,    value: '$totalLyrics', isDark: isDark)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatCell extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool isDark;
-  const _StatCell({required this.label, required this.value, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: PearlColors.textPrimary(isDark),
-              letterSpacing: -0.5,
-            )),
-        const SizedBox(height: 4),
-        Text(label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: PearlColors.textSecondary(isDark),
-            )),
-      ],
-    );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  final bool isDark;
-  const _Divider({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1, height: 36,
-      color: PearlColors.bgTertiary(isDark),
-    );
   }
 }
 
