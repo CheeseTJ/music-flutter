@@ -41,12 +41,21 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
   bool _currentSongVisible = true;
   int? _pendingRestoreId; // 冷启动待恢复的歌曲 ID
 
+  /// 当前曲目在 filtered 里的下标（-1 = 不在列表里）。
+  /// 只在 build 里算一次：滚动监听器靠它做 O(1) 算术，而不是每帧遍历歌单。
+  int _currentIdx = -1;
+
+  static const double _itemHeight = 68.0;
+
   @override
   void initState() {
     super.initState();
     _updateGreeting();
     _scheduleGreetingRefresh();
     _scrollCtrl.addListener(_checkVisibility);
+    // 首帧布局完成前拿不到 viewport 高度（hasClients 为 false），
+    // 所以布局后再校正一次可见性；之后由滚动监听和 build 各自负责。
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
   }
 
   @override
@@ -125,33 +134,28 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
     });
   }
 
-  /// 检测当前播放歌曲是否在 ListView 可视区域内。
-  /// 不可见时显示定位按钮，可见时自动隐藏。
-  void _checkVisibility() {
-    if (!_scrollCtrl.hasClients) return;
-    final currentSong = ref.read(playerProvider.notifier).currentSong;
-    if (currentSong == null) {
-      if (_currentSongVisible != true) {
-        setState(() => _currentSongVisible = true);
-      }
-      return;
-    }
-    final songs = ref.read(songListProvider).valueOrNull ?? [];
-    final filtered = _applyFilter(songs);
-    final idx = filtered.indexWhere((s) => s.id == currentSong.id);
-    if (idx < 0) {
-      if (_currentSongVisible != true) {
-        setState(() => _currentSongVisible = true);
-      }
-      return;
-    }
-
+  /// 当前播放歌曲是否在可视区域内（纯算术，O(1)）。
+  bool _isCurrentVisible() {
+    if (_currentIdx < 0 || !_scrollCtrl.hasClients) return true;
     final viewport = _scrollCtrl.position.viewportDimension;
     final offset = _scrollCtrl.position.pixels;
-    const itemH = 68.0;
-    final itemTop = idx * itemH - offset;
-    final itemBottom = (idx + 1) * itemH - offset;
-    final visible = itemBottom > 0 && itemTop < viewport;
+    final itemTop = _currentIdx * _itemHeight - offset;
+    final itemBottom = (_currentIdx + 1) * _itemHeight - offset;
+    return itemBottom > 0 && itemTop < viewport;
+  }
+
+  /// 滚动位置变化的回调。
+  ///
+  /// 这个函数在滚动时每帧都会被调用，所以它只允许做算术：过滤后的歌单和
+  /// 当前曲目的下标都在 build 里算好了（见 [_currentIdx]）。之前这里每次都
+  /// 重新 `_applyFilter` + `indexWhere`，等于每帧复制一遍全表再扫一遍，
+  /// 上千首的库直接掉帧。
+  void _checkVisibility() {
+    if (_currentIdx < 0) {
+      if (!_currentSongVisible) setState(() => _currentSongVisible = true);
+      return;
+    }
+    final visible = _isCurrentVisible();
     if (visible != _currentSongVisible) {
       setState(() => _currentSongVisible = visible);
     }
@@ -280,8 +284,15 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
 
     _scheduleRestore(ref);
 
-    // 每次 build 后重新检测当前歌曲可见性（覆盖切歌等场景）
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
+    // 过滤结果和「当前曲目在列表里的下标」都只在这里算一次。
+    // 滚动监听器（每帧触发）只做算术，不再遍历歌单。
+    _currentIdx = currentSong == null
+        ? -1
+        : filtered.indexWhere((s) => s.id == currentSong.id);
+    // 切歌 / 换筛选后同步一次可见性，替代之前每次 build 都挂一个
+    // postFrameCallback 去重复检测。
+    final currentVisible = _isCurrentVisible();
+    _currentSongVisible = currentVisible;
 
     // Tab bar: 64 height + 16 bottom padding + safe area
     // Mini player: 68 height + 8 gap (only when song exists and setting is on)
@@ -472,12 +483,12 @@ class _CollectionPageState extends ConsumerState<CollectionPage> {
             },
           ),
           // 定位当前播放歌曲按钮（仅当歌曲滚出可视区域时显示）
-          if (hasSong && showMiniPlayer && filtered.any((s) => s.id == currentSong.id))
+          if (hasSong && showMiniPlayer && _currentIdx >= 0)
             Positioned(
               right: 16,
               bottom: 64.0 + 16.0 + bottomInset + miniPlayerHeight + 12,
               child: AnimatedOpacity(
-                opacity: _currentSongVisible ? 0.0 : 1.0,
+                opacity: currentVisible ? 0.0 : 1.0,
                 duration: const Duration(milliseconds: 300),
                 child: _LocateButton(
                   scrollCtrl: _scrollCtrl,
