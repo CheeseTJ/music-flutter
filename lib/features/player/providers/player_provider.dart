@@ -21,13 +21,30 @@ class PlayerState {
   final int playMode;
   final bool lyricLoading;
   final bool lyricFailed;
-  const PlayerState(this.phase, {this.playMode = 0, this.lyricLoading = false, this.lyricFailed = false});
-  PlayerState copyWith({PlayerPhase? phase, int? playMode, bool? lyricLoading, bool? lyricFailed}) =>
+
+  /// 当前在线曲目的标识（`platform|id`；本地曲目为 null）。
+  ///
+  /// 必须放进 state：界面靠它决定「哪一行高亮」「要不要显示底部小组件」，
+  /// 而它变化时 phase 不一定跟着变（连着点两首是 loading → loading）。
+  /// 如果只改 controller 的普通字段，不会触发重建，界面就会一直停在上一首
+  /// —— 表现为「点了 B，A 还在转圈」。
+  final String? playingUrlId;
+
+  const PlayerState(this.phase, {this.playMode = 0, this.lyricLoading = false, this.lyricFailed = false, this.playingUrlId});
+  PlayerState copyWith({
+    PlayerPhase? phase,
+    int? playMode,
+    bool? lyricLoading,
+    bool? lyricFailed,
+    String? playingUrlId,
+    bool clearPlayingUrlId = false,
+  }) =>
       PlayerState(
         phase ?? this.phase,
         playMode: playMode ?? this.playMode,
         lyricLoading: lyricLoading ?? this.lyricLoading,
         lyricFailed: lyricFailed ?? this.lyricFailed,
+        playingUrlId: clearPlayingUrlId ? null : (playingUrlId ?? this.playingUrlId),
       );
   factory PlayerState.idle() => const PlayerState(PlayerPhase.idle);
   factory PlayerState.loading() => const PlayerState(PlayerPhase.loading);
@@ -44,8 +61,7 @@ class PlayerController extends StateNotifier<PlayerState> {
   List<LocalSong> _playlist = [];
   int _currentIndex = -1;
 
-  String? _playingUrlId;
-  String? get playingUrlId => _playingUrlId;
+  String? get playingUrlId => state.playingUrlId;
 
   LrcParser? _lyric;
   int _currentLyricIndex = -1;
@@ -215,8 +231,7 @@ class PlayerController extends StateNotifier<PlayerState> {
     _currentSong = song;
     _lyric = null;
     _currentLyricIndex = -1;
-    _playingUrlId = null;
-    state = state.copyWith(phase: PlayerPhase.loading);
+    state = state.copyWith(phase: PlayerPhase.loading, clearPlayingUrlId: true);
 
     final data = await _apiClient.getPlayUrl(song.id);
     if (!isCurrentLoad(seq)) return;
@@ -408,7 +423,6 @@ class PlayerController extends StateNotifier<PlayerState> {
   int beginOnlinePlay(String title, String artist, {String? platform, String? id}) {
     _prePlay ??= _PrePlaySnapshot(
       song: _currentSong,
-      playingUrlId: _playingUrlId,
       playlist: _playlist,
       index: _currentIndex,
       lyric: _lyric,
@@ -417,17 +431,22 @@ class PlayerController extends StateNotifier<PlayerState> {
     );
     final seq = ++_loadSeq;
     final songId = int.tryParse(id ?? '') ?? 0;
+    final urlId = (platform != null && id != null) ? '$platform|$id' : null;
     _currentSong = LocalSong(
         id: songId, title: title, artist: artist, album: '',
         format: '', duration: 0, size: 0, createdAt: 0);
     _lyric = null;
     _currentLyricIndex = -1;
-    _playingUrlId = (platform != null && id != null) ? '$platform|$id' : null;
     // 维护单曲 playlist，使 next/previous 可用
     _playlist = [_currentSong!];
     _currentIndex = 0;
     state = state.copyWith(
-        phase: PlayerPhase.loading, lyricLoading: false, lyricFailed: false);
+      phase: PlayerPhase.loading,
+      lyricLoading: false,
+      lyricFailed: false,
+      playingUrlId: urlId,
+      clearPlayingUrlId: urlId == null,
+    );
     return seq;
   }
 
@@ -439,7 +458,6 @@ class PlayerController extends StateNotifier<PlayerState> {
     _prePlay = null;
     if (snap == null) return;
     _currentSong = snap.song;
-    _playingUrlId = snap.playingUrlId;
     _playlist = snap.playlist;
     _currentIndex = snap.index;
     _lyric = snap.lyric;
@@ -545,9 +563,9 @@ final playerProvider = StateNotifierProvider<PlayerController, PlayerState>((ref
 });
 
 /// 进入在线播放预备态前的播放器快照，用于取链失败时还原界面。
+/// playingUrlId 在 state 里，随 [state] 一起还原。
 class _PrePlaySnapshot {
   final LocalSong? song;
-  final String? playingUrlId;
   final List<LocalSong> playlist;
   final int index;
   final LrcParser? lyric;
@@ -556,7 +574,6 @@ class _PrePlaySnapshot {
 
   const _PrePlaySnapshot({
     required this.song,
-    required this.playingUrlId,
     required this.playlist,
     required this.index,
     required this.lyric,

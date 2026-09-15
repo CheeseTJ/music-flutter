@@ -474,9 +474,12 @@ class _InternetSearchPageState extends ConsumerState<InternetSearchPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final notifier = ref.watch(playerProvider.notifier);
-    final playingUrlId = notifier.playingUrlId;
-    final playerPhase = ref.watch(playerProvider.select((v) => v.phase));
+    // 必须同时监听 playingUrlId：连着点两首时 phase 不变（loading → loading），
+    // 只 select phase 的话不会重建，界面就停在上一首 —— 表现为「点了 B，
+    // A 还在转圈」。
+    final (playingUrlId, playerPhase) = ref.watch(
+      playerProvider.select((v) => (v.playingUrlId, v.phase)),
+    );
     final hasSong = playingUrlId != null && playerPhase != PlayerPhase.idle && playerPhase != PlayerPhase.error;
     final showMiniPlayer = ref.watch(showMiniPlayerProvider);
     final bottomInset = MediaQuery.of(context).padding.bottom;
