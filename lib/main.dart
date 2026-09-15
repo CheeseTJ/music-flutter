@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
-import 'core/debug/layout_debug.dart';
 import 'core/i18n/app_strings.dart';
 import 'core/utils/settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  LayoutDebug.installLayoutDebugger();
 
   // 语言必须在第一帧之前定下来：否则英文用户会先闪一帧中文。
   // 读取是异步的，所以 main 是 async —— 代价是启动时多一次 SharedPreferences 读。
