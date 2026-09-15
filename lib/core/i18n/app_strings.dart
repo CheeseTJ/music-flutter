@@ -54,7 +54,8 @@ abstract class AppStrings {
   String get noHistory;
   String get historyEmptyHint;
   String get library;
-  String get librarySub;
+  String storageUsage(String percent, String quota);
+  String get storageUnavailable;
   String get statSongs;
   String get statLyrics;
   String get settingsTitle;
@@ -199,7 +200,9 @@ class AppStringsZh extends AppStrings {
   @override
   String get library => '曲库';
   @override
-  String get librarySub => '本机上的音频与歌词缓存';
+  String storageUsage(String percent, String quota) => '已用 $percent · 共 $quota';
+  @override
+  String get storageUnavailable => '暂时取不到云端占用';
   @override
   String get statSongs => '歌曲';
   @override
@@ -399,7 +402,9 @@ class AppStringsEn extends AppStrings {
   @override
   String get library => 'Library';
   @override
-  String get librarySub => 'Audio + lyric cache on this device';
+  String storageUsage(String percent, String quota) => '$percent used of $quota';
+  @override
+  String get storageUnavailable => 'Cloud usage unavailable';
   @override
   String get statSongs => 'Songs';
   @override

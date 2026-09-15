@@ -88,6 +88,17 @@ class ApiClient {
     }
   }
 
+  /// 曲库在 R2 上的真实占用。服务端转发官方的 bucket usage 接口，
+  /// 返回 usedBytes / quotaBytes / objectCount / measuredAt。
+  Future<Map<String, dynamic>> getStorage() async {
+    final headers = _signer.generateSignature('GET', '/storage');
+    final response = await _dio.get(
+      '/storage',
+      options: Options(headers: headers),
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Never _throwDioError(DioException e, String op) {
     String detail = e.message ?? '';
     if (e.response != null) {

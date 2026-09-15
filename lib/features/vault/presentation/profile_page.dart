@@ -15,6 +15,7 @@ import '../../../core/utils/settings.dart';
 import '../../../core/widgets/pearl_toast.dart';
 import '../../collection/providers/song_list_provider.dart';
 import '../../player/providers/player_provider.dart';
+import '../providers/storage_provider.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 import '../../../core/widgets/pearl_loading.dart';
 
@@ -44,23 +45,16 @@ class _VaultPageState extends ConsumerState<VaultPage> {
     final songs = songsAsync.valueOrNull ?? const [];
     final totalSongs = songs.length;
     final totalLyrics = songs.where((s) => s.hasLyric).length;
-    final audioSize = songs.fold<int>(0, (sum, s) => sum + s.size);
-    // Rough estimate of LRC memory:
-    //   ~3 KB per minute of song (a typical LRC line is 60-120 bytes
-    //   and there are ~15-20 lines per minute). Used only for the
-    //   headline storage number, so the user understands the "real"
-    //   on-device footprint includes the lyric cache.
-    final lyricBytes = songs.where((s) => s.hasLyric).fold<int>(
-          0,
-          (sum, s) => sum + (s.duration ~/ 60) * 3072,
-        );
-    final totalStorage = audioSize + lyricBytes;
+    // 容量不再由前端按歌曲 size 估算：直接读服务端转发的官方 bucket usage，
+    // 那才是真实的云端占用（含歌词对象、孤儿对象和元数据）。
+    final storageAsync = ref.watch(storageProvider);
 
     return Column(
       children: [
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async {
+              ref.invalidate(storageProvider);
               await ref.read(songListProvider.notifier).load();
             },
             child: ListView(
@@ -68,7 +62,8 @@ class _VaultPageState extends ConsumerState<VaultPage> {
               padding: EdgeInsets.fromLTRB(20, 4, 20, bottomPadding),
               children: [
                 _StorageHero(
-                  totalStorage: totalStorage,
+                  storage: storageAsync.valueOrNull,
+                  failed: storageAsync.hasError,
                   isDark: isDark,
                 ),
                 const SizedBox(height: 20),
@@ -112,17 +107,24 @@ class _VaultPageState extends ConsumerState<VaultPage> {
 }
 
 // ============================================================
-//  Storage hero: huge headline number with gradient + subtitle
+//  Storage hero: 真实云端占用 + 占比
 // ============================================================
 class _StorageHero extends StatelessWidget {
-  final int totalStorage;
+  /// null = 还没取到（加载中或失败）
+  final RemoteStorage? storage;
+  final bool failed;
   final bool isDark;
 
-  const _StorageHero({required this.totalStorage, required this.isDark});
+  const _StorageHero({
+    required this.storage,
+    required this.failed,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
     final accent = PearlColors.accent(isDark);
+    final s = storage;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
@@ -155,7 +157,7 @@ class _StorageHero extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(_formatSize(totalStorage),
+              Text(s == null ? '—' : _formatSize(s.usedBytes),
                   style: TextStyle(
                     fontSize: 44,
                     fontWeight: FontWeight.w800,
@@ -166,7 +168,7 @@ class _StorageHero extends StatelessWidget {
               const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(_unitFor(totalStorage),
+                child: Text(s == null ? '' : _unitFor(s.usedBytes),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -175,21 +177,49 @@ class _StorageHero extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(L.s.librarySub,
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: s?.usedRatio ?? 0,
+              minHeight: 5,
+              backgroundColor: accent.withValues(alpha: 0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (s == null && !failed)
+            PearlLoading(size: 14, color: accent)
+          else
+            Text(
+              s == null
+                  ? L.s.storageUnavailable
+                  : L.s.storageUsage(
+                      '${(s.usedRatio * 100).toStringAsFixed(1)}%',
+                      '${_formatSize(s.quotaBytes)}${_unitFor(s.quotaBytes)}',
+                    ),
               style: TextStyle(
                 fontSize: 13,
                 color: PearlColors.textSecondary(isDark),
-              )),
+              ),
+            ),
         ],
       ),
     );
   }
 
+  /// 单位用十进制（1000），与 Cloudflare 的 GB-month 口径一致 ——
+  /// dashboard 上看到的 3.9 GB 就是这个口径。
   String _unitFor(int bytes) {
-    if (bytes < 1024 * 1024) return 'KB';
-    if (bytes < 1024 * 1024 * 1024) return 'MB';
+    if (bytes < 1000 * 1000) return 'KB';
+    if (bytes < 1000 * 1000 * 1000) return 'MB';
     return 'GB';
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1000 * 1000) return (bytes / 1000).toStringAsFixed(0);
+    if (bytes < 1000 * 1000 * 1000) return (bytes / (1000 * 1000)).toStringAsFixed(1);
+    return (bytes / (1000 * 1000 * 1000)).toStringAsFixed(2);
   }
 }
 
@@ -997,11 +1027,4 @@ class _SectionTitle extends StatelessWidget {
           letterSpacing: -0.2,
         ));
   }
-}
-
-String _formatSize(int bytes) {
-  if (bytes < 1024) return '${bytes}';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)}';
-  if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}';
-  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)}';
 }
