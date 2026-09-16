@@ -202,6 +202,14 @@ final audioHandlerProvider = StateProvider<MusicAudioHandler>((ref) {
   return handler;
 });
 
+/// 初始化 audio_service：后台播放 + 通知栏播控。
+///
+/// 别把「通知栏播控」和「锁屏播控卡片 / 控制中心媒体卡片」混为一谈。前者是
+/// Android 标准能力，我们已完整适配（会话 active、flags 含 TRANSPORT_CONTROLS、
+/// PlaybackState 有 actions、通知 category=transport）。后者在华为 / vivo / OPPO
+/// 上是厂商白名单机制，非白名单应用拿不到，**改代码无解** —— 别为此 fork
+/// audio_service 去补 setCategory / setFlags，那些字段本来就是对的。
+/// 详见 README「锁屏 / 控制中心的媒体播控：厂商白名单问题」。
 Future<void> initAudioService(StateController<MusicAudioHandler> controller) async {
   debugPrint('[AudioService] init start');
   final info = await NotificationService.debugInfo();
