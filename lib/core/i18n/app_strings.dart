@@ -37,6 +37,9 @@ abstract class AppStrings {
   String countSongs(String n);
   String get play;
   String get pause;
+  /// 通知栏/锁屏播控按钮的无障碍文案
+  String get previousSong;
+  String get nextSong;
   String get uploadLyrics;
   String get deleteSong;
   String deleteFailed(String e);
@@ -163,6 +166,10 @@ class AppStringsZh extends AppStrings {
   String get play => '播放';
   @override
   String get pause => '暂停';
+  @override
+  String get previousSong => '上一首';
+  @override
+  String get nextSong => '下一首';
   @override
   String get uploadLyrics => '上传歌词';
   @override
@@ -361,6 +368,10 @@ class AppStringsEn extends AppStrings {
   String get play => 'Play';
   @override
   String get pause => 'Pause';
+  @override
+  String get previousSong => 'Previous';
+  @override
+  String get nextSong => 'Next';
   @override
   String get uploadLyrics => 'Upload lyrics';
   @override

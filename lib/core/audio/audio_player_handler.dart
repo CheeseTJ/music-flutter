@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'notification_service.dart';
-import 'custom_notification_service.dart';
 import 'package:music_app/core/i18n/app_strings.dart';
 
 class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
@@ -66,21 +65,48 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   Duration? get duration => _player.duration;
   bool get playing => _isPlaying;
 
+  /// 通知栏 / 锁屏上的操作按钮。
+  ///
+  /// 不用 [MediaControl] 的预设常量（skipToPrevious 等）：那些预设指向插件
+  /// 自带的图标（audio_service_skip_next 之类），造型老旧，label 也固定为
+  /// 英文。这里换成自绘的白色矢量图标，label 跟随界面语言。
+  ///
+  /// 刻意不含停止按钮：停止会清空当前曲目（迷你播放器一起消失），语义上
+  /// 跟暂停重复但后果更重，放通知栏容易被误触。
+  List<MediaControl> _buildControls({required bool playing}) => [
+        MediaControl(
+          androidIcon: 'drawable/ic_notif_prev',
+          label: L.s.previousSong,
+          action: MediaAction.skipToPrevious,
+        ),
+        if (playing)
+          MediaControl(
+            androidIcon: 'drawable/ic_notif_pause',
+            label: L.s.pause,
+            action: MediaAction.pause,
+          )
+        else
+          MediaControl(
+            androidIcon: 'drawable/ic_notif_play',
+            label: L.s.play,
+            action: MediaAction.play,
+          ),
+        MediaControl(
+          androidIcon: 'drawable/ic_notif_next',
+          label: L.s.nextSong,
+          action: MediaAction.skipToNext,
+        ),
+      ];
+
   void _broadcastState(PlaybackEvent event) {
     final playing = _player.playing;
     playbackState.add(playbackState.value.copyWith(
-      controls: [
-        MediaControl.skipToPrevious,
-        if (playing) MediaControl.pause else MediaControl.play,
-        MediaControl.skipToNext,
-        MediaControl.stop,
-      ],
+      controls: _buildControls(playing: playing),
       systemActions: const {
         MediaAction.skipToPrevious,
         MediaAction.playPause,
         MediaAction.skipToNext,
         MediaAction.seek,
-        MediaAction.stop,
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: const {
@@ -205,6 +231,9 @@ Future<void> initAudioService(StateController<MusicAudioHandler> controller) asy
       }
     }
   }
-  debugPrint('[AudioService] init failed after 3 attempts, falling back to custom notification');
-  CustomNotificationService.enable();
+  // 不再退回到「自研通知」那条路径。它的 MediaSession 既没有回调也没有
+  // MediaMetadata，华为等厂商的系统不会把它渲染成锁屏播控卡片；按钮还得
+  // 再维护一套。现在只留 audio_service 这一条，初始化失败就只是没通知，
+  // 播放本身不受影响。
+  debugPrint('[AudioService] init failed after 3 attempts; notification unavailable');
 }

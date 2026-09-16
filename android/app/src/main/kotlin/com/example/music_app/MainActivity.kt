@@ -3,16 +3,11 @@ package com.example.music_app
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -29,32 +24,13 @@ class MainActivity : AudioServiceActivity() {
         private const val CHANNEL_ID = "com.example.music_app.channel.audio"
         private const val CHANNEL_NAME = "音乐播放"
         private const val METHOD_CHANNEL = "com.example.music_app/notification"
+
+        // 自研通知时期用过的渠道，现已废弃。保留这个常量只为了在用户设备上
+        // 把它删掉（见 createNotificationChannel）。
+        private const val LEGACY_CUSTOM_CHANNEL_ID = "com.example.music_app.channel.player"
     }
 
     private var notificationChannel: MethodChannel? = null
-    private var customNotif: CustomMediaNotification? = null
-    private var flutterCallback: MethodChannel.Result? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    private val notificationActionReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            Log.d(TAG, "Notification action: ${intent.action}")
-            when (intent.action) {
-                CustomMediaNotification.ACTION_PLAY -> {
-                    notificationChannel?.invokeMethod("onPlay", null)
-                }
-                CustomMediaNotification.ACTION_PAUSE -> {
-                    notificationChannel?.invokeMethod("onPause", null)
-                }
-                CustomMediaNotification.ACTION_SKIP_NEXT -> {
-                    notificationChannel?.invokeMethod("onSkipNext", null)
-                }
-                CustomMediaNotification.ACTION_SKIP_PREV -> {
-                    notificationChannel?.invokeMethod("onSkipPrev", null)
-                }
-            }
-        }
-    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -77,25 +53,6 @@ class MainActivity : AudioServiceActivity() {
                 "debugInfo" -> {
                     result.success(getDebugInfo())
                 }
-                // Custom notification methods
-                "showCustomNotification" -> {
-                    val title = call.argument<String>("title") ?: ""
-                    val artist = call.argument<String>("artist") ?: ""
-                    val album = call.argument<String>("album") ?: ""
-                    val coverUrl = call.argument<String>("coverUrl")
-                    val playing = call.argument<Boolean>("playing") ?: true
-                    showCustomNotification(title, artist, album, coverUrl, playing)
-                    result.success(true)
-                }
-                "updateCustomPlayState" -> {
-                    val playing = call.argument<Boolean>("playing") ?: false
-                    updateCustomPlayState(playing)
-                    result.success(true)
-                }
-                "hideCustomNotification" -> {
-                    hideCustomNotification()
-                    result.success(true)
-                }
                 else -> result.notImplemented()
             }
         }
@@ -107,54 +64,16 @@ class MainActivity : AudioServiceActivity() {
         createNotificationChannel()
         requestNotificationPermission()
         logNotificationStatus()
-
-        val filter = IntentFilter().apply {
-            addAction(CustomMediaNotification.ACTION_PLAY)
-            addAction(CustomMediaNotification.ACTION_PAUSE)
-            addAction(CustomMediaNotification.ACTION_SKIP_NEXT)
-            addAction(CustomMediaNotification.ACTION_SKIP_PREV)
-        }
-        registerReceiver(notificationActionReceiver, filter)
-    }
-
-    override fun onDestroy() {
-        try {
-            unregisterReceiver(notificationActionReceiver)
-        } catch (_: Exception) {}
-        customNotif?.cancel()
-        super.onDestroy()
-    }
-
-    private fun showCustomNotification(
-        title: String, artist: String, album: String,
-        coverUrl: String?, playing: Boolean
-    ) {
-        try {
-            if (customNotif == null) {
-                customNotif = CustomMediaNotification(this)
-            }
-            customNotif?.updateMeta(title, artist, album, coverUrl, playing)
-            Log.d(TAG, "Custom notification shown: $title")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to show custom notification: ${e.message}")
-        }
-    }
-
-    private fun updateCustomPlayState(playing: Boolean) {
-        customNotif?.updatePlayState(playing)
-    }
-
-    private fun hideCustomNotification() {
-        customNotif?.cancel()
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
+            // 删掉历史遗留的自研通知渠道，避免它在通知设置里继续占一行。
+            manager.deleteNotificationChannel(LEGACY_CUSTOM_CHANNEL_ID)
             // Delete old channels so importance level takes effect
             manager.deleteNotificationChannel(CHANNEL_ID)
-            manager.deleteNotificationChannel("com.example.music_app.channel.player")
-            // Audio service channel
+            // 播放通知渠道（由 audio_service 使用）
             val audioChannel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
@@ -168,20 +87,6 @@ class MainActivity : AudioServiceActivity() {
             }
             manager.createNotificationChannel(audioChannel)
             Log.d(TAG, "Audio channel created: $CHANNEL_ID")
-            // Custom notification channel
-            val customChannel = NotificationChannel(
-                "com.example.music_app.channel.player",
-                "播放控制",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "自定义播放控制通知"
-                setShowBadge(false)
-                enableLights(false)
-                enableVibration(false)
-                setSound(null, null)
-            }
-            manager.createNotificationChannel(customChannel)
-            Log.d(TAG, "Custom channel created: com.example.music_app.channel.player")
         }
     }
 

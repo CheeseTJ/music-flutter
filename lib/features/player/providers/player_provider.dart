@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../../data/models/song.dart';
 import '../../../core/audio/audio_player_handler.dart';
-import '../../../core/audio/custom_notification_service.dart';
 import '../../../core/utils/playback_history.dart';
 import '../../../core/utils/settings.dart';
 import '../../../data/models/lrc_parser.dart';
@@ -128,7 +127,6 @@ class PlayerController extends StateNotifier<PlayerState> {
 
   PlayerController(this._apiClient, this._handler) : super(PlayerState.idle()) {
     _wireHandlerCallbacks();
-    _wireCustomNotificationActions();
     _restorePlayMode();
   }
 
@@ -150,34 +148,6 @@ class PlayerController extends StateNotifier<PlayerState> {
     _handler.onSkipToPrevious = () {
       if (_playlist.isNotEmpty) previous(forced: true);
     };
-  }
-
-  StreamSubscription<String>? _customNotifSub;
-  void _wireCustomNotificationActions() {
-    if (!CustomNotificationService.isEnabled) return;
-    _customNotifSub = CustomNotificationService.onAction.listen((action) {
-      switch (action) {
-        case 'play':
-          // 加载期间播放器里还是上一首，见 _controlsReady
-          if (!_controlsReady) break;
-          _handler.play();
-          state = state.copyWith(phase: PlayerPhase.playing);
-          CustomNotificationService.updatePlayState(true);
-          break;
-        case 'pause':
-          if (!_controlsReady) break;
-          _handler.pause();
-          state = state.copyWith(phase: PlayerPhase.paused);
-          CustomNotificationService.updatePlayState(false);
-          break;
-        case 'skipNext':
-          if (_playlist.isNotEmpty) next(forced: true);
-          break;
-        case 'skipPrev':
-          if (_playlist.isNotEmpty) previous(forced: true);
-          break;
-      }
-    });
   }
 
   MusicAudioHandler get handler => _handler;
@@ -227,13 +197,6 @@ class PlayerController extends StateNotifier<PlayerState> {
       await _handler.play();
       if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.playing);
-      // 原生侧用 URL(...).openConnection() 取图，只认带协议的地址。
-      // 而 _lastCoverUrl 是本地文件路径（没有协议），直接传过去会 MalformedURLException，
-      // 被 catch 吞掉，表现就是通知栏永远显示兜底 logo、从不显示真实封面。
-      // 这里统一转成 file:// URI（java.net.URL 支持 file 协议）。
-      _syncCustomNotification(_lastCoverUrl != null
-          ? Uri.file(_lastCoverUrl!).toString()
-          : _fallbackArtUri?.toString());
       _wirePlayerStreams();
       _fetchLyric(song.id);
     } catch (e) {
@@ -525,7 +488,6 @@ class PlayerController extends StateNotifier<PlayerState> {
       state = state.copyWith(phase: PlayerPhase.playing);
       // 已经真正开播，预备态不再需要回滚
       _prePlay = null;
-      _syncCustomNotification(null);
       // 在线播放也写入历史，保证最新一条可被冷启动恢复
       final songId = _currentSong?.id ?? 0;
       if (songId != 0) {
@@ -552,33 +514,14 @@ class PlayerController extends StateNotifier<PlayerState> {
     if (_handler.playing) {
       _handler.pause();
       state = state.copyWith(phase: PlayerPhase.paused);
-      CustomNotificationService.updatePlayState(false);
     } else {
       _handler.play();
       state = state.copyWith(phase: PlayerPhase.playing);
-      CustomNotificationService.updatePlayState(true);
     }
   }
 
   void seekTo(Duration position) {
     _handler.seek(position);
-  }
-
-  void _syncCustomNotification(String? coverUrl) {
-    if (!CustomNotificationService.isEnabled) return;
-    final song = _currentSong;
-    if (song == null) {
-      debugPrint('[CustomNotif] _syncCustomNotification skipped: no current song');
-      return;
-    }
-    debugPrint('[CustomNotif] _syncCustomNotification: ${song.title} - ${song.artist}, coverUrl=$coverUrl');
-    CustomNotificationService.show(
-      title: song.title,
-      artist: song.artist,
-      album: song.album,
-      coverUrl: coverUrl,
-      playing: true,
-    );
   }
 
   void togglePlayMode() {
@@ -593,8 +536,6 @@ class PlayerController extends StateNotifier<PlayerState> {
     _durationSub?.cancel();
     _completeSub?.cancel();
     _playingSub?.cancel();
-    _customNotifSub?.cancel();
-    CustomNotificationService.hide();
     super.dispose();
   }
 }
