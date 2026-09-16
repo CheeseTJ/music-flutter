@@ -1,7 +1,7 @@
 name: music_app
 description: Personal Cloud Music App
 publish_to: 'none'
-version: 1.2.20+33
+version: 1.2.21+34
 
 environment:
   sdk: ^3.5.0

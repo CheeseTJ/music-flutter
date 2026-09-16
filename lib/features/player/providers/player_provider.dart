@@ -284,11 +284,15 @@ class PlayerController extends StateNotifier<PlayerState> {
   }
 
   Future<void> _fetchLyric(int songId) async {
+    // 记录发起时的请求序号。歌词是异步取的，期间用户可能已切到别的歌；
+    // 慢的那次完成后若不校验，会把上一首的歌词盖到当前歌曲上（歌词对不上）。
+    final seq = _loadSeq;
     state = state.copyWith(lyricLoading: true, lyricFailed: false);
 
     await _ensureLyricCacheDir();
     final cached = await _readLyricCache(songId);
     if (cached != null) {
+      if (!isCurrentLoad(seq)) return;
       _lyric = LrcParser.parse(cached);
       state = state.copyWith(lyricLoading: false);
       return;
@@ -296,14 +300,17 @@ class PlayerController extends StateNotifier<PlayerState> {
 
     try {
       final lrcText = await _apiClient.getLyric(songId);
+      if (!isCurrentLoad(seq)) return;
       if (lrcText.isNotEmpty) {
         _lyric = LrcParser.parse(lrcText);
         await _writeLyricCache(songId, lrcText);
+        if (!isCurrentLoad(seq)) return;
         state = state.copyWith(lyricLoading: false);
       } else {
         state = state.copyWith(lyricLoading: false, lyricFailed: true);
       }
     } catch (_) {
+      if (!isCurrentLoad(seq)) return;
       _lyric = null;
       state = state.copyWith(lyricLoading: false, lyricFailed: true);
     }
