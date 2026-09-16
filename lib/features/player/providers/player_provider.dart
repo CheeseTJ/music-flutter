@@ -180,7 +180,6 @@ class PlayerController extends StateNotifier<PlayerState> {
       if (!_handler.playing) {
         state = state.copyWith(phase: PlayerPhase.paused);
       }
-      _fetchLyric(song.id);
     } catch (e) {
       if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.error);
@@ -198,7 +197,6 @@ class PlayerController extends StateNotifier<PlayerState> {
       if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.playing);
       _wirePlayerStreams();
-      _fetchLyric(song.id);
     } catch (e) {
       if (!isCurrentLoad(seq)) return;
       state = state.copyWith(phase: PlayerPhase.error);
@@ -224,7 +222,13 @@ class PlayerController extends StateNotifier<PlayerState> {
       phase: PlayerPhase.loading,
       clearPlayingUrlId: true,
       currentSongId: song.id,
+      lyricFailed: false,
     );
+
+    // 歌词与取链/封面并行取，且在这里触发而非等 play()/load() 走到末尾。
+    // 冷启动恢复期间点下一首，play() 可能因 _loadSeq 被更快的请求作废而提前
+    // return，若 _fetchLyric 只挂在末尾就不会被触发，歌词会一直停在 loading。
+    _fetchLyric(song.id, seq);
 
     final data = await _apiClient.getPlayUrl(song.id);
     if (!isCurrentLoad(seq)) return;
@@ -283,10 +287,9 @@ class PlayerController extends StateNotifier<PlayerState> {
     }
   }
 
-  Future<void> _fetchLyric(int songId) async {
-    // 记录发起时的请求序号。歌词是异步取的，期间用户可能已切到别的歌；
+  Future<void> _fetchLyric(int songId, int seq) async {
+    // 用调用方传入的 seq 判定竞态：歌词是异步取的，期间用户可能已切到别的歌；
     // 慢的那次完成后若不校验，会把上一首的歌词盖到当前歌曲上（歌词对不上）。
-    final seq = _loadSeq;
     state = state.copyWith(lyricLoading: true, lyricFailed: false);
 
     await _ensureLyricCacheDir();
