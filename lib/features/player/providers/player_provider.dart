@@ -338,7 +338,18 @@ class PlayerController extends StateNotifier<PlayerState> {
       state = state.copyWith(phase: PlayerPhase.playing);
     } else {
       state = state.copyWith(phase: PlayerPhase.paused);
-      next();
+      // next() 内部第一步是 await _handler.stop()，若这里抛异常（如 super.stop()
+      // 的 playbackState.firstWhere 时序问题），此前是未 await、未捕获的 Future，
+      // 异常直接变成 unhandled error，自动切歌就静默失败、停在暂停态。
+      _autoNext();
+    }
+  }
+
+  Future<void> _autoNext() async {
+    try {
+      await next();
+    } catch (e, stack) {
+      debugPrint('[onSongEnd] auto-next failed: $e\n$stack');
     }
   }
 

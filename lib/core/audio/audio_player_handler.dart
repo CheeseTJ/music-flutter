@@ -149,7 +149,10 @@ class MusicAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> play() async {
     debugPrint('[AudioHandler] play');
-    _player.play();
+    // 必须 await：_player.play() 内部可能因音频会话激活失败而静默回退
+    // （把 playing 置回 false），不 await 的话调用方会误以为已经开播，
+    // 自动切歌场景就表现为「播完没下一首」。
+    await _player.play();
     _isPlaying = true;
   }
 
