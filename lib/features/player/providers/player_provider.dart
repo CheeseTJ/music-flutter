@@ -139,6 +139,11 @@ class PlayerController extends StateNotifier<PlayerState> {
   void setHandler(MusicAudioHandler handler) {
     _handler = handler;
     _wireHandlerCallbacks();
+    // 播放器流订阅必须紧跟 handler 挂上，而不是只在 load()/play() 末尾。
+    // 否则冷启动恢复期间点下一首，play() 可能因 _loadSeq 被更快的请求作废而
+    // 提前 return，_playingSub 根本没订阅，phase 就一直停在 loading——
+    // 音频和歌词其实都正常，只有播放按钮的转圈卡住。
+    _wirePlayerStreams();
   }
 
   void _wireHandlerCallbacks() {
