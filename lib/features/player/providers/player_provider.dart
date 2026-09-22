@@ -139,6 +139,9 @@ class PlayerController extends StateNotifier<PlayerState> {
   void setHandler(MusicAudioHandler handler) {
     _handler = handler;
     _wireHandlerCallbacks();
+    // 通话模式事件（厂商 ROM 不发焦点回调时的兜底）要转给这里换上的这个
+    // handler，不能各自在构造函数里登记 —— 详见 markAsActiveHandler 的注释。
+    _handler.markAsActiveHandler();
     // 播放器流订阅必须紧跟 handler 挂上，而不是只在 load()/play() 末尾。
     // 否则冷启动恢复期间点下一首，play() 可能因 _loadSeq 被更快的请求作废而
     // 提前 return，_playingSub 根本没订阅，phase 就一直停在 loading——

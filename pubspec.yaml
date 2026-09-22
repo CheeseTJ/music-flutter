@@ -1,7 +1,7 @@
 name: music_app
 description: Personal Cloud Music App
 publish_to: 'none'
-version: 1.2.23+36
+version: 1.2.24+37
 
 environment:
   sdk: ^3.5.0
@@ -15,6 +15,9 @@ dependencies:
   flutter_riverpod: ^2.5.0
   go_router: ^14.0.0
   just_audio: ^0.9.38
+  # 音频焦点 / 中断（来电、其他 app 抢焦点）的实际归属者。必须显式声明并配置：
+  # 它的兜底配置不拒绝 duck，来电/提示音会和音乐同时出声。
+  audio_session: ^0.1.25
   audio_service: ^0.18.15
   dio: ^5.4.0
   flutter_svg: ^2.0.10
